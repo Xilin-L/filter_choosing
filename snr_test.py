@@ -214,9 +214,9 @@ def calcStdvHistogram(img,stdFiltRangePx=1,plotStdvImg=False):
 
     hist,edges = histogram(imgStdv)
 
-    if plotStdvImg is True:
+    imgStdv = np.clip(imgStdv, edges[0], edges[-1]) # shifted this line from if statement below
 
-        imgStdv = np.clip(imgStdv,edges[0],edges[-1])
+    if plotStdvImg is True:
 
         plt.imshow(imgStdv,"gray")
 

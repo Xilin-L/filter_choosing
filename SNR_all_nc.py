@@ -4,9 +4,16 @@ import re
 import numpy as np
 from snr_test import tomoSliceSNR
 
-def process_nc_files(base_path):
-    results = []
+def process_nc_files(base_path, output_csv):
     pattern = re.compile(r'tomoSlice([XYZ])')
+
+    # Open the CSV file in append mode and write the header if it doesn’t exist
+    with open(output_csv, mode='a', newline='') as file:
+        writer = csv.writer(file)
+
+        # Check if the file is empty to add headers only once
+        if file.tell() == 0:
+            writer.writerow(["Experiment", "Slice Dimension", "SNR"])
 
     for root, dirs, files in os.walk(base_path):
         for file in files:
@@ -15,21 +22,22 @@ def process_nc_files(base_path):
                 if match:
                     file_path = os.path.join(root, file)
                     folder_name = os.path.basename(root)
+
+                    # Calculate SNR
                     snr = tomoSliceSNR(file_path)
-                    new_file_name = match.group(1)
-                    results.append([folder_name, new_file_name, snr])
+                    slice_dimension = match.group(1)  # Extract X, Y, or Z from filename
 
-    return results
+                    # Write the result to the CSV file
+                    with open(output_csv, mode='a', newline='') as file:
+                        writer = csv.writer(file)
+                        writer.writerow([folder_name, slice_dimension, snr])
+                        print(f"Updated {output_csv} with {file_path} SNR.")
 
-def save_results_to_csv(results, output_csv):
-    with open(output_csv, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(["Experiment", "Slice Dimension", "SNR"])
-        writer.writerows(results)
 
 if __name__ == "__main__":
     base_path = '/home/xilin/projects/Testing123/'
-    output_csv = '/home/xilin/projects/Testing123/snr_results.csv'
-    results = process_nc_files(base_path)
-    save_results_to_csv(results, output_csv)
-    print(f"Results saved to {output_csv}")
+    output_csv = '/home/xilin/projects/Testing123/snr_results_new.csv'
+
+    # Process files and update results in CSV after each calculation
+    process_nc_files(base_path, output_csv)
+    print(f"All results updated in {output_csv}")
