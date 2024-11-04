@@ -12,31 +12,19 @@ import matplotlib.pyplot as plt
 
 from resolution_estimation import generateTestImage
 
+'''
+define the SNR/CNR as follows:
+dataRange/noiseStdv
 
+where:
 
-# define the SNR/CNR as follows:
+dataRange = highestHistPeakPos - lowestHistPeakPos
+       OR = 5*stdv of noise free image (if only one peak in histogram)
+noise free image created by median filtering data
 
-# dataRange/noiseStdv
-
-#
-
-# where:
-
-#
-
-# dataRange = highestHistPeakPos - lowestHistPeakPos
-
-#        OR = 5*stdv of noise free image (if only one peak in histogram)
-
-# noise free image created by median filtering data
-
-#
-
-# noiseStdv = stdv of noise only image
-
-# lowest peak in the local stdv histogram
-
-
+noiseStdv = stdv of noise only image
+lowest peak in the local stdv histogram
+'''
 
 def getCumulativeHistProb(hist):
 
@@ -53,9 +41,7 @@ def getHistPercentilePos(hist,percentile=10):
     Nb = len(hist)
 
     if percentile < 0. or percentile > 100.:
-
-        raise Exception("Invalid percentile specified: %s%% (should be in [0,100])"%(percentile))
-
+        raise Exception("Invalid percentile specified: %s\\% (should be in [0,100])"%(percentile))
     else:
 
         prob = percentile/100.
@@ -120,6 +106,8 @@ def identifySignificantPeaks(hist):
 
 def optimiseHistogramRange(img,numBins=256):
 
+    img = img[~np.isnan(img)]  # Remove NaN values
+
     pmin = 100.0/float(numBins)
 
     pmax = 100.0-pmin
@@ -139,7 +127,7 @@ def calcDataRange(img,medFiltRangePx=1,plotHistChange=False):
     medFiltSizePx = 2*medFiltRangePx + 1
 
     imgMed = sp.ndimage.median_filter(img,medFiltSizePx)
-
+    imgMed = imgMed[~np.isnan(imgMed)]  # Remove NaN values
     hist,edges = histogram(img)
 
     vals = 0.5*(edges[1:] + edges[:-1]) # bin centers
@@ -233,9 +221,10 @@ def calcStdvHistogram(img,stdFiltRangePx=1,plotStdvImg=False):
         plt.imshow(imgStdv,"gray")
 
         plt.title("Local std. dev. (kernel size = %s px)"%(stdFiltSizePx))
-
+        plt.colorbar(label='Value')
         plt.show()
-
+    hist, edges = np.histogram(imgStdv[~np.isnan(imgStdv)],
+                               bins=256)  # the noise will occur more frequently with similar stdv than signal
     vals = 0.5*(edges[1:] + edges[:-1])
 
     return hist,vals
@@ -263,7 +252,7 @@ def calcNoiseStdv(img,stdFiltRangePx=1,plotData=False):
         plt.xlabel("local std. dev.")
 
         plt.ylabel("counts")
-
+        plt.semilogy()
         plt.legend()
 
         plt.show()
@@ -309,3 +298,110 @@ def estimateSNR(img,kernelRangePx=1,plotData=False):
     print("SNR = %s"%(snr))
 
     return snr
+
+
+
+# analyse .nc file
+import netCDF4 as nc
+
+def tomoSliceSNR(nc_file, plot=False, kernelRangePx=1):
+    tomoSlice = nc.Dataset(nc_file)
+    tomoData = np.array(tomoSlice.variables['tomo'][:], dtype=np.float32, copy=True)
+
+    # Determine the dimension with length 1
+    data_dim = np.argmin(tomoData.shape)
+
+    # Reshape the data to have the data dimension last
+    tomoData = np.moveaxis(tomoData, data_dim, -1)
+
+    if plot:
+        # Plot the grayscale image
+        tomoDataPlot = np.copy(tomoData) - 10000  # shift does not matter in the SNR calculation though
+        tomoDataPlot[tomoDataPlot < 0] = 0  # Set negative values to zero
+        plt.imshow(tomoDataPlot, cmap='gray')
+        plt.colorbar(label='Value')
+        plt.title('Grayscale Plot of Data Array')
+        plt.show()
+
+    # Estimate the SNR
+    if 'tomoSliceZ' in tomoSlice.filepath():
+        # to remove the container walls for the Z data
+        tomoDataFiltered = np.copy(tomoData)
+        center = np.array(tomoDataFiltered.shape) // 2
+        distance_from_center = np.sqrt(
+            ((np.indices(tomoDataFiltered.shape) - center[:, None, None, None]) ** 2).sum(axis=0))
+        tomoDataFiltered[(tomoDataFiltered < 0) | (
+                distance_from_center > center[0])] = np.nan  # Set negative values and values away from center to zero
+
+        snr = estimateSNR(tomoDataFiltered, kernelRangePx, plot)
+    else:
+        snr = estimateSNR(tomoData, kernelRangePx, plot)
+
+    return snr
+
+
+
+
+
+# if __name__ == "__main__":
+
+    # N = 512
+    # img = generateTestImage(N,pxSzMm=1.0,resMm=3.5,numPhotonsPerPx=1000.)
+    # plt.imshow(img)
+    # plt.show()
+    #
+    # snr1 = estimateSNR(img,1,True)
+    # snr2 = estimateSNR(img,2,True)
+    # snr3 = estimateSNR(img,3,True)
+
+
+
+    # from scipy import misc
+    # img = sp.misc.ascent().astype(np.float32)
+    # plt.imshow(img)
+    # plt.show()
+    #
+    # snr1 = estimateSNR(img,1,True)
+    #
+
+
+    # img = np.random.normal(100.,20.,size=(512,512))
+    # plt.imshow(img)
+    # plt.show()
+    #
+    # snr1 = estimateSNR(img,1,True)
+
+
+    # img = np.random.normal(1000.,100.,size=(512,512))
+    # img = sp.ndimage.gaussian_filter(img,5.0) # apply gaussian filter
+    # img -= np.min(img) # shift the minimum to zero
+    # # poisson-like distribution
+    # img = np.random.normal(img,np.sqrt(img)) # add poisson noise
+    # '''
+    #  larger sigma in producing img gives larger SNR due to the shift in the minimum,
+    #  the growth of poisson noise is slower than the growth of the data range
+    # '''
+    # plt.imshow(img)
+    # plt.colorbar()
+    # plt.show()
+    #
+    # snr1 = estimateSNR(img,1,True)
+
+    # from PIL import Image
+    #
+    # img = Image.open('/home/xilin/Downloads/pic5.jpg').convert('L')
+    # img = np.array(img, dtype=np.float32)
+    # plt.figaspect(1)
+    # plt.imshow(img, cmap='gray')
+    # plt.show()
+    #
+    # snr1 = estimateSNR(img, 1, True)
+    # snr2 = estimateSNR(img, 2, True)
+    # snr3 = estimateSNR(img, 3, True)
+    #
+
+
+
+
+
+    exit()
