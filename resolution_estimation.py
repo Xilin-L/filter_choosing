@@ -1,311 +1,265 @@
 import numpy as np
-
 import scipy as sp
-
 from scipy import ndimage
-
 from scipy import signal
-
 import matplotlib.pyplot as plt
+import concurrent.futures
 
+def getRadialGrid(Ny,Nx):
+    y = (np.arange(Ny) - Ny // 2).reshape((Ny, 1))
+    x = (np.arange(Nx) - Nx // 2).reshape((1, Nx))
+    return np.sqrt(y*y+x*x)
 
+def getMaxRadius(Ny,Nx):
+    return np.minimum(Ny,Nx)//2
 
-from image_resolution import generateTestImage
+def apodiseImageGauss(img): # apply Gaussian apodisation window function
+    Ny,Nx = img.shape
+    sigma = 0.4*getMaxRadius(Ny,Nx)
+    rad = getRadialGrid(Ny,Nx)
+    apodisationWindow = np.exp((-rad*rad)/(2.0*sigma*sigma))
+    return img*apodisationWindow
 
+def apodiseImage(img): # apply cosine apodisation window function
+    Ny,Nx = img.shape
+    y = 0.5 - 0.5*np.cos(10.0*np.pi*np.arange(Ny)/float(Ny))
+    y[Ny//10:Ny-Ny//10] = 1.0
+    x = 0.5 - 0.5*np.cos(10.0*np.pi*np.arange(Nx)/float(Nx))
+    x[Nx//10:Nx-Nx//10] = 1.0
+    apodisationWindow = y.reshape((Ny,1))*x.reshape((1,Nx))
+    return img*apodisationWindow
 
+def pearsonCrossCorr(imga,imgb): # Pearson cross correlation (equation 1 without mask)
+    pccNum = np.real(np.sum(imga*np.conjugate(imgb)))
+    denoma = np.real(np.sum(imga*np.conjugate(imga)))
+    denomb = np.real(np.sum(imgb * np.conjugate(imgb)))
+    pccDenom = np.sqrt(denoma*denomb)
+    return pccNum/pccDenom
 
-# define the SNR/CNR as follows:
-
-# dataRange/noiseStdv
-
-#
-
-# where:
-
-#
-
-# dataRange = highestHistPeakPos - lowestHistPeakPos
-
-#        OR = 5*stdv of noise free image (if only one peak in histogram)
-
-# noise free image created by median filtering data
-
-#
-
-# noiseStdv = stdv of noise only image
-
-# lowest peak in the local stdv histogram
-
-
-
-def getCumulativeHistProb(hist):
-
-    prob = hist/np.sum(hist)
-
-    cumHistProb = np.cumsum(prob) # CDF of the histogram
-
-    return cumHistProb
-
-
-
-def getHistPercentilePos(hist,percentile=10):
-
-    Nb = len(hist)
-
-    if percentile < 0. or percentile > 100.:
-
-        raise Exception("Invalid percentile specified: %s%% (should be in [0,100])"%(percentile))
-
+def pearsonCrossCorrMasked(imga,imgb,maskRadNorm=None): # Pearson cross correlation with mask (equation 1)
+    if np.abs(maskRadNorm)<0.00001:
+        return 0.
+    Ny,Nx = imga.shape
+    if maskRadNorm is None:
+        mask = np.ones((Ny,Nx),dtype=float)
+    elif maskRadNorm>=0. and maskRadNorm<=1.0:
+        rPx = float(getMaxRadius(Ny,Nx))*maskRadNorm
+        mask = getRadialGrid(Ny,Nx)<rPx
     else:
+        raise Exception("radius specified %s is in pixels? radius specified should be normalised, "
+                        "i.e., a fraction of the image pixel radius, i.e., in [0,1]"% maskRadNorm)
+    return pearsonCrossCorr(imga,imgb*mask)
 
-        prob = percentile/100.
+def decorr(img):
+    return decorrMasked(img)
 
-    cumHistProb = getCumulativeHistProb(hist)
+def decorrMasked(img,maskRadNorm=None):
+    apod = apodiseImage(img-np.mean(img)) # this is not used in this function
+    ft = np.fft.ifftshift(np.fft.fft2(np.fft.fftshift(img)))
+    reg = 0.01*np.mean(np.abs(ft))
+    phase = ft / (np.abs(ft) + reg)
+    pcc = pearsonCrossCorrMasked(ft,phase,maskRadNorm)
+    return pcc
 
-    pos = np.searchsorted(cumHistProb, prob) # faster sorting
+def getDecorrCurve(img,rMinPx=7.5):
+    Ny,Nx = img.shape
+    rMaxPx = getMaxRadius(Ny,Nx)
+    d = np.zeros(rMaxPx)
+    for rc in range(rMaxPx):
+        rNorm = rc/float(rMaxPx)
+        scale = np.minimum(rc/float(rMinPx),1.0)
+        d[rc] = scale*decorrMasked(img,rNorm)
+    return d # decorrelation with radius as index
 
-    # pos = 0
+def getSigmaList(sMinPx,sMaxPx,Ng=10):
+    # want list from sMin to sMax pixels
+    sExpMax = np.log(sMaxPx)
+    sExpMin = sOffset = np.log(sMinPx)
+    sExpStride = (sExpMax-sExpMin)/float(Ng)
+    sExpVals = np.arange(Ng)*sExpStride + sOffset
+    return np.exp(sExpVals)
 
-    # while cumHistProb[pos] < prob and pos < Nb-1:
+def getDecorrMax(d):
+    ri = np.argmax(d)
+    Ai = d[ri]
+    return ri,Ai
 
-    #     pos += 1
-
-    return pos
-
-
-
-def identifySignificantPeaks(hist):
-
-    Nb = len(hist)
-
-    probmin = 100.0/float(Nb)
-
-    pmin = getHistPercentilePos(hist,percentile=probmin)
-
-    probmax = 100.0 - probmin
-
-    pmax = getHistPercentilePos(hist,percentile=probmax)
-
-    peaks,_ = sp.signal.find_peaks(hist[pmin:pmax])
-
-    if not peaks.size:
-
-        raise Exception("no peaks found in median filtered image histogram.")
-
-    peaks += pmin
-
-    peakCounts = hist[peaks]
-
-    T = sp.ndimage.median(hist)
-
-    if T < 0.:
-
-        return peaks
-
+def getDecorrLocalMax(d):
+    rPeaks,_ = sp.signal.find_peaks(d)
+    if rPeaks.size:
+        dPeaks = d[rPeaks]
+        p = np.argmax(dPeaks)
+        ri = rPeaks[p]
+        Ai = dPeaks[p] # peak decorrelation
     else:
+        ri = 1
+        Ai = 0.
+    return ri,Ai
 
-        peaksOut = [peaks[pc] for pc in range(len(peaks)) if peakCounts[pc] > T]
+def unsharpMask(img,sigma):
+    return img - sp.ndimage.gaussian_filter(img,sigma)
 
-        # peaksOut = []
+def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=False,title=None):
+    # max = np.max(d)
+    # OR
+    # geoMax = np.max(r*d)
+    Ny,Nx = img.shape
+    rMaxPx = getMaxRadius(Ny,Nx)
+    Ng = len(sList)
 
-        # for pc in range(len(peaks)):
+    def process_sigma(sc):
+        sigma = sList[sc]
+        imgUnsharp = unsharpMask(img, sigma)
+        di = getDecorrCurve(imgUnsharp)
+        rPxi, Ai = getDecorrLocalMax(di)
+        currVal = rPxi
+        if geometricMax:
+            currVal *= Ai
+        return currVal, rPxi, Ai, sigma, di
 
-        #     if peakCounts[pc] > T:
+    with concurrent.futures.ThreadPoolExecutor() as executor: # parallel processing to speed up
+        results = list(executor.map(process_sigma, range(Ng)))
 
-        #         peaksOut.append(peaks[pc])
+    for currVal, rPxi, Ai, sigma, di in results:
+        print("r: %3d | A: %10f | Ar: %10f | sigmaPx: %0.2f" % (rPxi, Ai, Ai * rPxi, sigma))
+        if currVal > maxVal:
+            maxVal = currVal
+            maxPos = rPxi
+            maxSig = np.where(sList == sigma)[0][0]
+        if plot:
+            rNorm = np.arange(len(di)) / rMaxPx
+            plt.plot(rNorm, di, label="decorr sigPx=%0.2f" % (sigma))
+            if Ai > 0.:
+                plt.plot(rPxi / rMaxPx, Ai, "x")
+    if plot:
+        if title is not None:
+            plt.title(title)
+        plt.xlabel("Normalised frequency")
+        plt.ylabel("Pearson cross corr.")
+        plt.legend(loc='upper right')
+        plt.show()
+    return maxVal, maxPos, maxSig
 
-        return np.array(peaksOut)
 
 
+def findImageRes(img, pxSzMm=1.0, Ng=10, geometricMax=False, plot=True):
+    # max = np.max(d)
+    # OR
+    # geoMax = np.max(r*d)
+    Ny,Nx = img.shape
+    rMaxPx = getMaxRadius(Ny,Nx)
 
-def optimiseHistogramRange(img,numBins=256):
+    #first pass no sharpening
+    d0 = getDecorrCurve(img)
+    rPx0,A0 = getDecorrLocalMax(d0)
+    print("r: %3d | A: %10f | Ar: %10f"%(rPx0,A0,A0*rPx0))
+    maxVal = rPx0
+    if geometricMax:
+        maxVal *= A0
+    maxPos = rPx0
+    maxSig = 0.
 
-    pmin = 100.0/float(numBins)
+    rNorm = np.arange(len(d0))/rMaxPx
 
-    pmax = 100.0-pmin
-
-    return np.percentile(img,(pmin,pmax))
-
-
-
-def histogram(data,bins=256):
-
-    return np.histogram(data,bins=bins,range=optimiseHistogramRange(data))
-
-
-
-def calcDataRange(img,medFiltRangePx=1,plotHistChange=False):
-
-    medFiltSizePx = 2*medFiltRangePx + 1
-
-    imgMed = sp.ndimage.median_filter(img,medFiltSizePx)
-
-    hist,edges = histogram(img)
-
-    vals = 0.5*(edges[1:] + edges[:-1]) # bin centers
-
-    histMed,edgesMed = histogram(imgMed)
-
-    valsMed = 0.5*(edgesMed[1:] + edgesMed[:-1]) # bin centers after median filter
-
-    sigma = len(histMed)/256.
-
-    histMedSmth = sp.ndimage.gaussian_filter(histMed,sigma)
-
-    peaks = identifySignificantPeaks(histMedSmth)
-
-    if not peaks.size:
-
-        raise Exception("no peaks found in median filtered image histogram.")
-
-    elif peaks.size<2: # for single peak
-
-        if peaks[0] > 0 and histMedSmth[0] > histMedSmth[peaks[0]]:
-
-            # if the left end is a peak
-
-            dmin = valsMed[0]
-
-            dmax = valsMed[peaks[0]]
-
-            dataRange = dmax - dmin
-
-        elif peaks[0] < len(histMedSmth) - 1 and histMedSmth[-1] > histMedSmth[peaks[-1]]:
-
-            # if the right end is a peak
-
-            dmin = valsMed[peaks[0]]
-
-            dmax = valsMed[-1]
-
-            dataRange = dmax - dmin
-
-        else:
-
-            print("Only a single peak found in the histgram, determining data range as 5 x sigma")
-
-            dataRangeSigma = np.std(imgMed)
-
-            dataRange = 5.0*dataRangeSigma
-
-    else:
-
-        dmin = valsMed[peaks[0]]
-
-        dmax = valsMed[peaks[-1]]
-
-        dataRange = dmax - dmin
-
-    if plotHistChange is True:
-
-        plt.plot(vals,hist,label="hist.")
-
-        plt.plot(valsMed,histMed,label="med hist.")
-
-        plt.plot(valsMed,histMedSmth,label="smth med hist.")
-
-        plt.plot(valsMed[peaks],histMedSmth[peaks],"x", markersize=10, markeredgewidth=2, label="peaks")
-
-        plt.xlabel("img. gray values")
-
-        plt.ylabel("counts")
-
-        plt.legend()
-
+    if plot:
+        plt.plot(rNorm,d0,label="decorr init.")
+        plt.plot(rPx0/rMaxPx,A0,"x")
+        plt.xlabel("Normalised frequency")
+        plt.ylabel("Pearson cross corr.")
         plt.show()
 
-    return dataRange
+    # repeat Ng times with sigma in sList
+    sMaxPx = 2.*rMaxPx/rPx0
+    sMinPx = 1.0/2.355
+    sList = getSigmaList(sMinPx,sMaxPx,Ng)
+    maxVal,maxPos,maxSig = performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax,plot=True,title="Coarse Scan")
 
-
-
-def calcStdvHistogram(img,stdFiltRangePx=1,plotStdvImg=False):
-
-    stdFiltSizePx = 2*stdFiltRangePx + 1
-
-    imgStdv = sp.ndimage.generic_filter(img, np.std, size=stdFiltSizePx) # local std. dev. within given filter size
-
-    hist,edges = histogram(imgStdv)
-
-    if plotStdvImg is True:
-
-        imgStdv = np.clip(imgStdv,edges[0],edges[-1])
-
-        plt.imshow(imgStdv,"gray")
-
-        plt.title("Local std. dev. (kernel size = %s px)"%(stdFiltSizePx))
-
-        plt.show()
-
-    vals = 0.5*(edges[1:] + edges[:-1])
-
-    return hist,vals
-
-
-
-def calcNoiseStdv(img,stdFiltRangePx=1,plotData=False):
-
-    hist,vals = calcStdvHistogram(img,stdFiltRangePx,plotData)
-
-    sigma = len(hist)/100.
-
-    histSmth = sp.ndimage.gaussian_filter(hist,sigma)
-
-    peaks,_ = sp.signal.find_peaks(histSmth)
-
-    if plotData is True:
-
-        plt.plot(vals,hist,label="hist.")
-
-        plt.plot(vals,histSmth,label="smth hist.")
-
-        plt.plot(vals[peaks],histSmth[peaks],"x", markersize=10, markeredgewidth=2,label="peaks")
-
-        plt.xlabel("local std. dev.")
-
-        plt.ylabel("counts")
-
-        plt.legend()
-
-        plt.show()
-
-    if not peaks.size:
-
-        if np.max(histSmth) > histSmth[0]:
-
-            peaks = np.array([0])
-
-        else:
-
-            raise Exception("No peaks found in the stdv histogram. Unable to estimate noise levels.")
-
-    if histSmth[0] > histSmth[peaks[0]]:
-
-        peak = 0
-
+    # refine for sigma around maxSig
+    if maxSig > 0:
+        sMinPx = sList[maxSig-1]
+        sMaxPx = sList[maxSig]
     else:
+        sMinPx = 0.15
+        sMaxPx = sList[0]
+    sList = getSigmaList(sMinPx,sMaxPx,Ng)
+    maxVal,maxPos,maxSig = performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax,plot=True,title="Refinement Scan")
 
-        peak = peaks[0] # select the lowest peak as the noise stdv
+    # return image resolution
+    resPx = 2.0*rMaxPx/maxPos
+    return pxSzMm*resPx
 
-    stdv = vals[peak]
+def generateTestImage(N,pxSzMm=1.0,resMm=3.5,numPhotonsPerPx=1000.):
+    img = np.ones((N,N),dtype=np.float32)
+    loc = N//20
+    lic = N//9
+    ric = N - lic
+    roc = N - loc
+    # add contanier walls
+    img[:,loc:lic] = 0.5
+    img[:,ric:roc] = 0.5
+    # add (N/10)*(N/10) random spheres
+    nSpheres = (N//30)**2
+    for sc in range(nSpheres):
+        r = np.random.uniform(N/40,N/20)
+        cy = np.random.uniform(N/20,N-N/20)
+        cx = np.random.uniform(lic+N/20,ric-N/20)
+        trans = np.random.normal(0.2,0.04)
+        y = (np.arange(N)-cy).reshape((N,1))
+        x = (np.arange(N)-cx).reshape((1,N))
+        rad = np.sqrt(x*x + y*y)
+        circ = 1.0-trans*(rad<=r)
+        img *= circ
+    # define resPx as FWHM = 2.355*sigmaPx, therefore:
+    resPx = resMm/pxSzMm # resolution in pixels
+    sigmaPx = resPx/2.355
+    # input image already has resPx = 2, so adjust sigmaPx:
+    sigmaPx = np.sqrt(sigmaPx**2 - (2.0/2.355)**2) # why in this form?
+    # perform Gaussian blurring
+    img = sp.ndimage.gaussian_filter(img,sigmaPx)
+    # add Poisson noise
+    img = np.random.poisson(img*numPhotonsPerPx)/numPhotonsPerPx
+    ## linearise image
+    img = -np.log(img)
+    return img
 
-    return stdv
 
 
+import netCDF4 as nc
 
-def estimateSNR(img,kernelRangePx=1,plotData=False):
+def tomoSliceRes(nc_file, pxSzMm=1.0, Ng=8, geometricMax=False, plot=True, crop=False):
+    tomoSlice = nc.Dataset(nc_file)
+    tomoData = np.array(tomoSlice.variables['tomo'][:], dtype=np.float32, copy=True)
 
-    print("Using size = %s for a median filter and local std. dev. estimates:"%(2*kernelRangePx+1))
+    # Determine the dimension with length 1
+    data_dim = np.argmin(tomoData.shape)
 
-    dataRange = calcDataRange(img,kernelRangePx,plotData)
+    # Reshape the data to have the data dimension last
+    tomoData = np.moveaxis(tomoData, data_dim, -1)
 
-    print("data range = %s"%(dataRange))
+    # have problem with space frequency calculation
+    if crop:
+        # Crop the data to the center 0.7*edge length square
+        edge_length = np.min(tomoData.shape[:2])
+        crop_size = int(0.7 * edge_length)
+        start_y = (tomoData.shape[0] - crop_size) // 2
+        start_x = (tomoData.shape[1] - crop_size) // 2
+        tomoDataFiltered = tomoData[start_y:start_y + crop_size, start_x:start_x + crop_size]
 
-    noiseStdv = calcNoiseStdv(img,kernelRangePx,plotData)
+        res = findImageRes(np.squeeze(tomoDataFiltered), pxSzMm, Ng, geometricMax, plot)
+    else:
+        res = findImageRes(np.squeeze(tomoData),pxSzMm, Ng, geometricMax, plot)
 
-    print("noise stdv = %s"%(noiseStdv))
+    return res
 
-    snr = dataRange/noiseStdv
 
-    print("SNR = %s"%(snr))
+if __name__ == "__main__":
+    #img = sp.misc.ascent().astype(np.float32)
+    img = generateTestImage(512)
+    Ny,Nx = img.shape
+    plt.imshow(img,"gray")
+    plt.colorbar()
+    plt.show()
+    res = findImageRes(img)
+    print(res)
 
-    return snr
+    exit()
