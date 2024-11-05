@@ -36,7 +36,7 @@ def process_nc_files(base_path, output_csv):
 
 if __name__ == "__main__":
     base_path = '/home/xilin/projects/Testing123/'
-    output_csv = '/home/xilin/projects/Testing123/snr_results_new.csv'
+    output_csv = '/home/xilin/projects/Testing123/snr_results_new2.csv'
 
     # Process files and update results in CSV after each calculation
     process_nc_files(base_path, output_csv)

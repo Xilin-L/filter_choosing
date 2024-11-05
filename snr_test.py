@@ -118,7 +118,7 @@ def optimiseHistogramRange(img,numBins=256):
 
 def histogram(data,bins=256):
 
-    return np.histogram(data,bins=bins,range=optimiseHistogramRange(data))
+    return np.histogram(data[~np.isnan(data)],bins=bins,range=optimiseHistogramRange(data))
 
 
 
@@ -214,18 +214,17 @@ def calcStdvHistogram(img,stdFiltRangePx=1,plotStdvImg=False):
 
     hist,edges = histogram(imgStdv)
 
-    imgStdv = np.clip(imgStdv, edges[0], edges[-1]) # shifted this line from if statement below
+    vals = 0.5*(edges[1:] + edges[:-1])
 
     if plotStdvImg is True:
+        imgStdv = np.clip(imgStdv, edges[0], edges[-1]) # shifted this line from if statement below
 
         plt.imshow(imgStdv,"gray")
 
         plt.title("Local std. dev. (kernel size = %s px)"%(stdFiltSizePx))
         plt.colorbar(label='Value')
         plt.show()
-    hist, edges = np.histogram(imgStdv[~np.isnan(imgStdv)],
-                               bins=256)  # the noise will occur more frequently with similar stdv than signal
-    vals = 0.5*(edges[1:] + edges[:-1])
+
 
     return hist,vals
 
