@@ -184,7 +184,7 @@ def getMaterialProperties(material):
         Helper function to get properties of a single material with case-sensitive matching.
         this part is the old getMaterialProperty() function
         """
-        if ("sandstone" in mat) or ("clastic" in mat):
+        if ("sandstone" in mat) or ("clastic" in mat) or ("glass" in mat):
             # Z=8	: 0.532565
             # Z=14	: 0.467435
             materialWeights = [0.532565, 0.467435]
@@ -242,9 +242,19 @@ def getMaterialProperties(material):
         elif ("softwood" in mat): # assuming not dried
             materialWeights = [0.06, 0.52, 0.42]
             materialSymbols = ["H", "C", "O"]
-            dens= 0.50    # Pine 
+            dens= 0.50    # Pine
+        elif mat.lower() == "ti" or mat.lower() == "titanium":
+            materialWeights = [1.0]
+            materialSymbols = ["Ti"]
+            dens = 4.51
+        elif mat.lower() == "pmma" or mat.lower() == "acrylic":
+            materialWeights = [0.080541, 0.599846, 0.319613]
+            materialSymbols = ["H", "C", "O"]
+            dens = 1.18
         else:
-            raise Exception(f"Unknown sample material: '{mat}'. Valid materials are: 'sandstone', 'clastic', 'limestone', 'carbonate', 'haematite', 'goethite', 'iron ore', 'PEEK', 'Al', 'Xe', 'Ti64', 'wood'.")
+            raise Exception(f"Unknown sample material: '{mat}'. Valid materials are: 'sandstone', 'clastic', "
+                            f"'limestone', 'carbonate', 'haematite', 'goethite', 'iron ore', 'PEEK', 'Al', 'Xe',"
+                            f" 'Ti64', 'wood', 'titanium', 'glass', 'acrylic'.")
         return materialWeights, materialSymbols, dens
 
     if isinstance(material, str):
