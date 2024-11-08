@@ -13,7 +13,7 @@ import spekpy
 import larch
 from larch import xray
 
-import xray_simulation as xs
+import xraySimulation as xs
 
 ### What are the requirements for the ideal filter? ###
 # 1 -X- rule of thumb (ROT), want filter to be equivalent to exp(-1) = 0.367 x diameter of sample * sample material * sample density. Maybe start here?

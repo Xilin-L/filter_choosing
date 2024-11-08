@@ -2,7 +2,7 @@ import os
 import csv
 import re
 import numpy as np
-from snr_test import tomoSliceSNR
+from snrTest import tomoSliceSNR
 
 def process_nc_files(base_path, output_csv):
     pattern = re.compile(r'tomoSlice([XYZ])')

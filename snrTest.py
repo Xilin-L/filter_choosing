@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 
 
 
-from resolution_estimation import generateTestImage
+from resolutionEstimation import generateTestImage
 
 '''
 define the SNR/CNR as follows:

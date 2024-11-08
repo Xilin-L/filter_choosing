@@ -2,7 +2,7 @@ import os
 import csv
 import re
 import numpy as np
-from resolution_estimation import tomoSliceRes  # Assuming findImageRes is imported from resolution_estimation module
+from resolutionEstimation import tomoSliceRes  # Assuming findImageRes is imported from resolution_estimation module
 
 
 def process_nc_files(base_path, output_csv, pxSzMm=1.0, Ng=8, geometricMax=False, plot=True, crop=False):

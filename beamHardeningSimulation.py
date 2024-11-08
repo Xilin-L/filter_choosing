@@ -7,8 +7,8 @@ import spekpy
 import larch
 from larch import xray
 
-import xray_simulation as xs
-import xray_imaging_performance as xip
+import xraySimulation as xs
+import xrayImagingPerformance as xip
 
 
 def generateCylinder(imgShape, vxSzMm=1.0, diameterMm=None, attPerCm=1.0):
