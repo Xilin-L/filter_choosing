@@ -131,14 +131,14 @@ def getMaterialProperties(material):
             # Z=14	: 0.467435
             materialWeights = [0.532565, 0.467435]
             materialSymbols = ["O", "Si"]
-            dens = 2.1
+            dens = 2.65
         elif mat.lower() == "limestone" or mat.lower() == "carbonate" or mat.lower() == "marble" or mat.lower() == "caco3":
             # Z=6	: 0.120005
             # Z=8	: 0.479564
             # Z=20	: 0.400431
             materialWeights = [0.120005, 0.479564, 0.400431]
             materialSymbols = ["C", "O", "Ca"]
-            dens = 2.65
+            dens = 2.71
         elif mat.lower() == "haematite":
             # Z=8	: 0.300567
             # Z=26	: 0.699433
