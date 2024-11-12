@@ -95,6 +95,7 @@ def estimateBeamHardening(spectrum,sampleAttPerCm,sampleDiameterMm,plot=False):
         plt.plot(bhcData[:,0],-np.log(bhcData[:,1]),label="data")
         plt.plot(bhcData[:,0],A*(bhcData[:,0]**n),label="fit")
         plt.legend()
+        plt.text(0.05, 0.95, f'A={A:.3f}, n={n:.3f}', transform=plt.gca().transAxes, verticalalignment='top')
         plt.show()
     return A,n
 
