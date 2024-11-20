@@ -195,6 +195,10 @@ def getMaterialProperties(material):
             materialWeights = [0.080541, 0.599846, 0.319613]
             materialSymbols = ["H", "C", "O"]
             dens = 1.18
+        elif mat.lower() == "greenalite":
+            materialWeights = [0.0094, 0.1744, 0.3748, 0.4414]
+            materialSymbols = ["H", "Si", "O", "Fe"]
+            dens = 3.08
         else:
             raise Exception(f"Unknown sample material: '{mat}'. Valid materials are: 'sandstone', 'clastic', "
                             f"'limestone', 'carbonate', 'haematite', 'goethite', 'iron ore', 'PEEK', 'Al', 'Xe',"
