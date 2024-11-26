@@ -6,12 +6,14 @@ import skimage as ski
 import spekpy
 import larch
 from larch import xray
+from skimage.transform import radon
 
 import xraySimulation as xs
 import xrayImagingPerformance as xip
 
 
 def generateCylinder(imgShape, vxSzMm=1.0, diameterMm=None, attPerCm=1.0):
+    # actually a circle
     Ny, Nx = imgShape
     DyMm = Ny * vxSzMm
     DxMm = Nx * vxSzMm
@@ -110,7 +112,7 @@ def projectWithBeamHardeningModel(imgIn, A, n, angles=None, vxSzMm=1.0):
     imgBin = enforceBinaryImage(imgIn)
 
     # get projected thickness (or pathlength)
-    pathlengthCm = getProjectedThicknessCm(imgBin, vxSzMm=vxSzMm)
+    pathlengthCm = getProjectedThicknessCm(imgBin, angles=angles, vxSzMm=vxSzMm)
     pathlengthMm = 10.0 * pathlengthCm
     polyAtt = applyBeamHardening(pathlengthMm, A, n)
     return polyAtt
@@ -130,30 +132,29 @@ def getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens):
     return sampleAttPerCm
 
 
-def runSimulation(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=10., kvp=60, filterMaterial='Al',
-                  filterThicknessMm=0.5, materialName='marble', plotIdeal=False,plotBH=True):
+def simulateBH(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=4., kvp=60, filterMaterial='Al',
+                  filterThicknessMm=0.5, materialName='marble', plotIdeal=False,plotBH=False, plotCurve=True,verbose=True):
 
     imgShape = (Ny, Nx)
     img = generateCylinder(imgShape, diameterMm=sampleDiameterMm, vxSzMm=vxSzMm)
 
     ### SIMPLE TEST ###
     sinogramIdeal = project(img, vxSzMm=vxSzMm)
-    recon = reconstruct(sinogramIdeal)
 
     if plotIdeal:
         plt.imshow(img, "gray") # plot the truth at given resolution
         plt.show()
         plt.imshow(sinogramIdeal, "gray") # plot the ideal sinogram (ideal -> defect-free)
         plt.show()
-        plt.imshow(recon, "gray") # plot the idea reconstruction
-        plt.show()
+
 
     ### ADD SPECTRUM INFO ###
     energyKeV, spectrum = setSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
     materialWeights, materialSymbols, dens = xip.getMaterialProperties(materialName)
     sampleAttPerCm = getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
-    A, n = xip.estimateBeamHardening(spectrum, sampleAttPerCm, sampleDiameterMm, plot=True)
-    print("BHC parms [A, n] = [%s, %s], bhcFactor = %s" % (A, n, 1. / n))
+    A, n = xip.estimateBeamHardening(spectrum, sampleAttPerCm, sampleDiameterMm, plot=plotCurve)
+    if verbose:
+        print("BHC parms [A, n] = [%s, %s], bhcFactor = %s" % (A, n, 1. / n))
 
     sinogram = projectSingleMaterialWithSpectrum(spectrum, sampleAttPerCm, img, angles=None, vxSzMm=vxSzMm)
 
@@ -162,12 +163,6 @@ def runSimulation(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=10., kvp=60, filt
 
     sinogramBH = projectWithBeamHardeningModel(img, A, n, vxSzMm=vxSzMm)
 
-    plt.plot(sinogramIdeal[:, 0], label="monochrom.")
-    plt.plot(sinogramBH[:, 0], label="beam hard.")
-    plt.plot(sinogram[:, 0], label="polychrom.")
-    plt.legend()
-    plt.show()
-
     recon = reconstruct(sinogram)
     if plotBH: # plot the beam-hardened sinogram and reconstruction
         plt.imshow(sinogram, "gray")
@@ -175,11 +170,48 @@ def runSimulation(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=10., kvp=60, filt
         plt.imshow(recon, "gray")
         plt.show()
 
-    plt.plot(recon[Ny // 2, :])
-    plt.show()
+    if plotCurve:
+        plt.plot(sinogramIdeal[:, 0], label="monochrom.")
+        plt.plot(sinogramBH[:, 0], label="beam hard.")
+        plt.plot(sinogram[:, 0], label="polychrom.")
+        plt.grid()
+        plt.legend()
+        plt.show()
+        plt.plot(recon[Ny // 2, :])
+        plt.show()
+
+
+    return 1./n, recon, sinogramBH, sinogramIdeal
+
+
+def bhcFromProj(vxSzMm=0.1, sampleDiameterMm=4., bhc=1.0,plot=False):
+    imgShape = (int(30 * sampleDiameterMm), int(30 * sampleDiameterMm))
+    img = generateCylinder(imgShape, diameterMm=sampleDiameterMm, vxSzMm=vxSzMm)
+    projIdeal = projectWithBeamHardeningModel(img, A=1.0 , n=1.0, angles=[0], vxSzMm=vxSzMm)
+    bhf=1./bhc
+    projBH = projectWithBeamHardeningModel(img, A=1.0 , n=bhf, angles=[0], vxSzMm=vxSzMm)
+
+    A, n = xip.fitPowerLawToBhcData(np.stack((projIdeal[:,0], np.exp(-projBH[:,0])), axis=1))
+    x = np.arange(100) * np.max(projIdeal[:,0]) / 100
+    if plot:
+        plt.plot(projIdeal[:,0],label="ideal")
+        plt.plot(projBH[:,0],label="BH")
+        plt.grid()
+        plt.legend()
+        plt.show()
+
+        plt.plot(x, A * x ** n, label="fit n = %s" % n)
+        plt.plot(projIdeal[:, 0], projBH[:, 0], "x", label="BH curve")
+        plt.legend()
+        plt.show()
+    return 1./n
+
+
 
 if __name__ == "__main__":
 
-    runSimulation(kvp=120, plotIdeal=False,plotBH=False)
+    # simulateBH(kvp=120, plotIdeal=True,plotBH=False, plotCurve=True)
+
+
 
     exit()
