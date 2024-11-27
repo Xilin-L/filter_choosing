@@ -147,7 +147,6 @@ def simulateBH(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=4., kvp=60, filterMa
         plt.imshow(sinogramIdeal, "gray") # plot the ideal sinogram (ideal -> defect-free)
         plt.show()
 
-
     ### ADD SPECTRUM INFO ###
     energyKeV, spectrum = setSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
     materialWeights, materialSymbols, dens = xip.getMaterialProperties(materialName)
@@ -157,7 +156,6 @@ def simulateBH(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=4., kvp=60, filterMa
         print("BHC parms [A, n] = [%s, %s], bhcFactor = %s" % (A, n, 1. / n))
 
     sinogram = projectSingleMaterialWithSpectrum(spectrum, sampleAttPerCm, img, angles=None, vxSzMm=vxSzMm)
-
     meanAttenuation = np.mean(sinogram) / np.mean(sinogramIdeal)
     sinogramIdeal *= meanAttenuation
 
@@ -180,11 +178,11 @@ def simulateBH(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=4., kvp=60, filterMa
         plt.plot(recon[Ny // 2, :])
         plt.show()
 
-
     return 1./n, recon, sinogramBH, sinogramIdeal
 
 
 def bhcFromProj(vxSzMm=0.1, sampleDiameterMm=4., bhc=1.0,plot=False):
+    # a trivial test to estimate the beam hardening coefficient from a given bhc
     imgShape = (int(30 * sampleDiameterMm), int(30 * sampleDiameterMm))
     img = generateCylinder(imgShape, diameterMm=sampleDiameterMm, vxSzMm=vxSzMm)
     projIdeal = projectWithBeamHardeningModel(img, A=1.0 , n=1.0, angles=[0], vxSzMm=vxSzMm)
@@ -192,8 +190,8 @@ def bhcFromProj(vxSzMm=0.1, sampleDiameterMm=4., bhc=1.0,plot=False):
     projBH = projectWithBeamHardeningModel(img, A=1.0 , n=bhf, angles=[0], vxSzMm=vxSzMm)
 
     A, n = xip.fitPowerLawToBhcData(np.stack((projIdeal[:,0], np.exp(-projBH[:,0])), axis=1))
-    x = np.arange(100) * np.max(projIdeal[:,0]) / 100
     if plot:
+        x = np.arange(100) * np.max(projIdeal[:, 0]) / 100
         plt.plot(projIdeal[:,0],label="ideal")
         plt.plot(projBH[:,0],label="BH")
         plt.grid()
@@ -207,10 +205,54 @@ def bhcFromProj(vxSzMm=0.1, sampleDiameterMm=4., bhc=1.0,plot=False):
     return 1./n
 
 
+def idealiseTomo(tomo, threshold=0.4):
+    # idealise the binarised tomogram
+    return (tomo > threshold).astype(np.float32)
+
+
+def estimateBhcFromTomo(tomo, sino, plot=False, verbose=True, refineData=False):
+    # Estimate the beam hardening coefficient from a tomogram and a sinogram
+    projIdeal = np.sum(idealiseTomo(enforceBinaryImage(tomo)), axis=0)
+    projBH = np.sum(tomo, axis=0)
+    # normalise them to make them comparable
+    projBH /= np.max(projBH)
+    sino[:, 0] /= np.max(sino[:, 0])
+    stackedData = np.stack((projIdeal, np.exp(-projBH)), axis=1)
+    stackedDataSino = np.stack((projIdeal, np.exp(-sino[:, 0])), axis=1)
+
+    # if refineData:
+    #     stackedData = stackedData[stackedData[:, 0].argsort()]  # Sort by the first column
+    #     _, idx = np.unique(stackedData[:, 0], return_index=True)  # Get the indices of unique first arguments
+    #     stackedData = np.array([stackedData[stackedData[:, 0] == val][-1]
+    #                             for val in np.unique(stackedData[:,0])])
+    #     # Keep only the rows with the largest second argument for the same first argument
+
+    A, n = xip.fitPowerLawToBhcData(stackedData)
+    A2, n2 = xip.fitPowerLawToBhcData(stackedDataSino)
+
+    if plot:
+        x = np.arange(100) * np.max(projIdeal) / 100
+        plt.plot(x, A * x ** n, label="fit n = %s" % n)
+        plt.plot(stackedData[:,0], -np.log(stackedData[:, 1]), "x", label="BH curve tomo")
+        plt.plot(x, A2 * x ** n2, label="fit n = %s" % n2)
+        plt.plot(stackedDataSino[:,0], -np.log(stackedDataSino[:, 1]), "x", label="BH curve sino")
+        plt.legend()
+        plt.show()
+    if verbose:
+        bhc=1./n
+        bhc2=1./n2
+        print("bhc tomo = %s" % bhc, "bhc sino = %s" % bhc2)
+    return 1./n, 1/n2
+
+
+
 
 if __name__ == "__main__":
 
-    # simulateBH(kvp=120, plotIdeal=True,plotBH=False, plotCurve=True)
+    bhc, tomo, sinoBH,_= simulateBH(Ny=400, Nx=400, vxSzMm=0.05, kvp=180,materialName='feo',
+                                    sampleDiameterMm=15.0, plotIdeal=False,plotBH=False, plotCurve=False)
+    estimateBhcFromTomo(tomo,sinoBH, plot=True)
+
 
 
 
