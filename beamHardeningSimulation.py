@@ -118,20 +118,6 @@ def projectWithBeamHardeningModel(imgIn, A, n, angles=None, vxSzMm=1.0):
     return polyAtt
 
 
-def setSpectrum(kvp, filterMaterial='Al', filterThicknessMm=0.5, plot=False):
-    # spectrum filtered and detected
-    energyKeV, spectrumIn = xs.generateEmittedSpectrum(kvp, filterMaterial, filterThicknessMm)
-    spectrumDet = xs.detectedSpectrum(energyKeV, spectrumIn)
-    if plot is True:
-        xs.plotSpectrum(energyKeV, spectrumDet, title="Spectrum at the detector")
-    return energyKeV, spectrumDet
-
-
-def getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens):
-    sampleAttPerCm = dens * xs.calcMassAttenuation(energyKeV, materialWeights, materialSymbols)
-    return sampleAttPerCm
-
-
 def simulateBH(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=4., kvp=60, filterMaterial='Al',
                   filterThicknessMm=0.5, materialName='marble', plotIdeal=False,plotBH=False, plotCurve=True,verbose=True):
 
@@ -148,9 +134,9 @@ def simulateBH(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=4., kvp=60, filterMa
         plt.show()
 
     ### ADD SPECTRUM INFO ###
-    energyKeV, spectrum = setSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
+    energyKeV, spectrum = xs.setSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
     materialWeights, materialSymbols, dens = xip.getMaterialProperties(materialName)
-    sampleAttPerCm = getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
+    sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
     A, n = xip.estimateBeamHardening(spectrum, sampleAttPerCm, sampleDiameterMm, plot=plotCurve)
     if verbose:
         print("BHC parms [A, n] = [%s, %s], bhcFactor = %s" % (A, n, 1. / n))

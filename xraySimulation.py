@@ -120,6 +120,10 @@ def calcMassAttenuation(energyKeV, materialWeights, materialSymbols, kind='total
         muPerCm += materialWeights[mc]*xray.mu_elam(materialSymbols[mc],energyEV)
     return muPerCm # list of mu factors per cm per density at different energies
 
+def getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens):
+    sampleAttPerCm = dens * calcMassAttenuation(energyKeV, materialWeights, materialSymbols)
+    return sampleAttPerCm
+
 def calcTransmission(energyKeV, materialWeights, materialSymbols, density, thicknessCm, kind='total'):
     muPerCm = calcMassAttenuation(energyKeV, materialWeights, materialSymbols, kind)
     return np.exp(-muPerCm*density*thicknessCm)
@@ -205,6 +209,15 @@ def detectedSpectrum(energyKeV, spectrumIn, cameraLengthMm=300, scintType="CsI")
     absorp = calcAbsorption(energyKeV, materialWeights, materialSymbols, dens, thicknessCm)
     spectrumOut *= absorp
     return spectrumOut
+
+def setSpectrum(kvp, filterMaterial='Al', filterThicknessMm=0.5, plot=False):
+    # spectrum filtered and detected
+    energyKeV, spectrumIn = generateEmittedSpectrum(kvp, filterMaterial, filterThicknessMm)
+    spectrumDet = detectedSpectrum(energyKeV, spectrumIn)
+    if plot is True:
+        plotSpectrum(energyKeV, spectrumDet, title="Spectrum at the detector")
+    return energyKeV, spectrumDet
+
 
 def plotSpectrum(energyKeV,spectrum,title=None):
     plt.plot(energyKeV,spectrum)
