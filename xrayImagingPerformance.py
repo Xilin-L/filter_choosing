@@ -206,7 +206,7 @@ def getMaterialProperties(material):
         else:
             raise Exception(f"Unknown sample material: '{mat}'. Valid materials are: 'sandstone', 'clastic', "
                             f"'limestone', 'carbonate', 'haematite', 'goethite', 'iron ore', 'PEEK', 'Al', 'Xe',"
-                            f" 'Ti64', 'wood', 'titanium', 'glass', 'acrylic', 'feo', 'wustite', 'hardwood', 'softwood'.")
+                            f" 'Ti64', 'titanium', 'glass', 'acrylic', 'feo', 'wustite', 'hardwood', 'softwood'.")
         return materialWeights, materialSymbols, dens
 
     if isinstance(material, str):
