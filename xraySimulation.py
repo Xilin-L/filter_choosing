@@ -6,7 +6,8 @@ from scipy import ndimage
 import matplotlib.pyplot as plt
 import spekpy
 import larch
-from larch import xray
+# from larch import xray
+import xraydb as xray
 
 ### SOME IMPORTANT INFO ON SPEKPY AND LARCH FUNCTIONS ###
 
