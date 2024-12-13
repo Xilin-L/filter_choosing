@@ -14,6 +14,7 @@ import larch
 from larch import xray
 
 import xraySimulation as xs
+import materialPropertiesData as mpd
 
 ### What are the requirements for the ideal filter? ###
 # 1 -X- rule of thumb (ROT), want filter to be equivalent to exp(-1) = 0.367 x diameter of sample * sample material * sample density. Maybe start here?
@@ -100,16 +101,15 @@ def estimateBeamHardening(spectrum,sampleAttPerCm,sampleDiameterMm,plot=False):
     return A,n
 
 
-
 def getMaterialProperties(material):
     """
     Retrieves material properties including elemental weight fractions, element symbols, and density.
     Supports both single materials and composite materials with strict, case-sensitive material names.
 
     Parameters:
-    - material (str or list): 
+    - material (str or list):
         - If str: Name of the material (e.g., "sandstone").
-        - If list: 
+        - If list:
             - First element: List of material names (exact case).
             - Second element: List of corresponding percentages (should sum to 1).
 
@@ -122,122 +122,20 @@ def getMaterialProperties(material):
     - Exception: If an unknown material is provided, input format is incorrect, or percentages are invalid.
     """
 
-    def get_single_material_properties(mat):
-        """
-        Helper function to get properties of a single material with case-sensitive matching.
-        this part is the old getMaterialProperty() function
-        """
-        if mat.lower() == "sandstone" or mat.lower() == "clastic" or mat.lower() == "glass":
-            # Z=8	: 0.532565
-            # Z=14	: 0.467435
-            materialWeights = [0.532565, 0.467435]
-            materialSymbols = ["O", "Si"]
-            dens = 2.65
-        elif mat.lower() == "limestone" or mat.lower() == "carbonate" or mat.lower() == "marble" or mat.lower() == "caco3":
-            # Z=6	: 0.120005
-            # Z=8	: 0.479564
-            # Z=20	: 0.400431
-            materialWeights = [0.120005, 0.479564, 0.400431]
-            materialSymbols = ["C", "O", "Ca"]
-            dens = 2.71
-        elif mat.lower() == "haematite":
-            # Z=8	: 0.300567
-            # Z=26	: 0.699433
-            materialWeights = [0.300567, 0.699433]
-            materialSymbols = ["O", "Fe"]
-            dens = 5.3
-        elif mat.lower() == "goethite":
-            # Z=1	: 0.011344
-            # Z=8	: 0.360129
-            # Z=26	: 0.628527
-            materialWeights = [0.011344, 0.360129, 0.628527]
-            materialSymbols = ["H", "O", "Fe"]
-            dens = 3.8  # 3.3 - 4.3
-        elif mat.lower() == "iron ore":
-            densSum = 5.3 + 3.8
-            materialWeights = (5.3 * np.array([0., 0.300567, 0.699433]) + 3.8 * np.array(
-                [0.011344, 0.360129, 0.628527])) / densSum
-            materialSymbols = ["H", "O", "Fe"]
-            dens = 0.5 * densSum
-        elif mat.lower() == "feo" or mat.lower() == "wustite":
-            materialWeights = [0.223, 0.777]
-            materialSymbols = ["O", "Fe"]
-            dens = 5.745
-        elif mat.lower() == "peek":
-            materialWeights = [0.041948, 0.791569, 0.166483]
-            materialSymbols = ["H", "C", "O"]
-            dens = 1.32
-        elif mat.lower() == "al":
-            materialWeights = [1.0]
-            materialSymbols = ["Al"]
-            dens = 2.70
-        elif mat.lower() == "xe":
-            materialWeights = [1.0]
-            materialSymbols = ["Xe"]
-            dens = 0.00589
-        elif mat.lower() == "ti64":  # the titanium alloy with 6% Al and 4% V by weight
-            materialWeights = [0.06, 0.90, 0.04]
-            materialSymbols = ["Al", "Ti", "V"]
-            dens = 4.43
-        elif mat.lower() == "hardwood":  # assuming not dried
-            materialWeights = [0.06, 0.52, 0.42]
-            materialSymbols = ["H", "C", "O"]
-            dens = 0.85  # Jarrah wood
-        elif mat.lower() == "softwood":  # assuming not dried
-            materialWeights = [0.06, 0.52, 0.42]
-            materialSymbols = ["H", "C", "O"]
-            dens = 0.50  # Pine
-        elif mat.lower() == "ti" or mat.lower() == "titanium":
-            materialWeights = [1.0]
-            materialSymbols = ["Ti"]
-            dens = 4.51
-        elif mat.lower() == "pmma" or mat.lower() == "acrylic":
-            materialWeights = [0.080541, 0.599846, 0.319613]
-            materialSymbols = ["H", "C", "O"]
-            dens = 1.18
-        elif mat.lower() == "greenalite":
-            materialWeights = [0.0094, 0.1744, 0.3748, 0.4414]
-            materialSymbols = ["H", "Si", "O", "Fe"]
-            dens = 3.08
-        elif mat.lower() == "dolomite":
-            materialWeights = [0.5206, 0.1303, 0.2173, 0.1318]
-            materialSymbols = ["C", "O", "Ca", "Mg"]
-            dens = 2.84
-        elif mat.lower() == "pyrex":
-            materialWeights = [0.540, 0.377, 0.04, 0.028, 0.011, 0.003]
-            materialSymbols = ["O", "Si", "B", "Na", "Al", "K"]
-            dens = 2.23
-        elif mat.lower() == "teflon":
-            materialWeights = [0.760, 0.240]
-            materialSymbols = ["F", "C"]
-            dens = 2.20
-        elif mat.lower() == "siderite":
-            materialWeights = [0.482, 0.1037, 0.4143]
-            materialSymbols = ["Fe", "C", "O"]
-            dens = 3.96
-        elif mat.lower() == "pyrite":
-            materialWeights = [0.4655, 0.5345]
-            materialSymbols = ["Fe", "S"]
-            dens = 5.01
-        elif mat.lower() == "chalcopyrite":
-            materialWeights = [0.3043, 0.3463, 0.3494]
-            materialSymbols = ["Fe", "Cu", "S"]
-            dens = 4.19
-        elif mat.lower() == "magnetite":
-            materialWeights = [0.7236, 0.2764]
-            materialSymbols = ["Fe", "O"]
-            dens = 5.15
-        else:
-            raise Exception(f"Unknown sample material: '{mat}'. Valid materials are: 'sandstone', 'clastic', "
-                            f"'limestone', 'carbonate', 'haematite', 'goethite', 'iron ore', 'PEEK', 'Al', 'Xe',"
-                            f" 'Ti64', 'titanium', 'glass', 'acrylic', 'feo', 'wustite', 'hardwood', 'softwood',"
-                            f" 'teflon', 'pyrex', 'siderite', 'pyrite', 'chalcopyrite', 'magnetite'.")
-        return materialWeights, materialSymbols, dens
-
     if isinstance(material, str):
         # Single material
-        materialWeights, materialSymbols, dens = get_single_material_properties(material)
-        return materialWeights, materialSymbols, dens
+        material = material.lower()
+        if material in mpd.materialProperties:
+            props = mpd.materialProperties[material]
+            return props["weights"], props["symbols"], props["density"]
+        elif material in mpd.materialNameMapping:
+            canonical_name = mpd.materialNameMapping[material]
+            props = mpd.materialProperties[canonical_name]
+            return props["weights"], props["symbols"], props["density"]
+        else:
+            valid_materials = list(mpd.materialProperties.keys()) + list(mpd.materialNameMapping.keys())
+            raise Exception(f"Unknown sample material: '{material}'. "
+                            f"Valid materials are: {', '.join(valid_materials)}.")
 
     elif isinstance(material, list):
         if len(material) != 2:
@@ -260,8 +158,19 @@ def getMaterialProperties(material):
         combined_density = 0.0
 
         for mat, perc in zip(materials_list, percentages_list):
-            mat_weights, mat_symbols, mat_dens = get_single_material_properties(mat)
-            
+            mat = mat.lower()
+            if mat in mpd.materialProperties:
+                props = mpd.materialProperties[mat]
+            elif mat in mpd.materialNameMapping:
+                canonical_name = mpd.materialNameMapping[mat]
+                props = mpd.materialProperties[canonical_name]
+            else:
+                valid_materials = list(mpd.materialProperties.keys()) + list(mpd.materialNameMapping.keys())
+                raise Exception(f"Unknown sample material: '{mat}'. "
+                                f"Valid materials are: {', '.join(valid_materials)}.")
+
+            mat_weights, mat_symbols, mat_dens = props["weights"], props["symbols"], props["density"]
+
             # Accumulate density as weighted average
             combined_density += perc * mat_dens
 
@@ -288,7 +197,6 @@ def getMaterialProperties(material):
 
     else:
         raise Exception("Input material must be either a string or a list of two lists [materials, percentages].")
-
 
 
 def getFilterAttPerCm(energyKeV,filterMaterial="Cu"): # added Cu as an option

@@ -1,0 +1,124 @@
+
+materialNameMapping = {
+    "clastic": "sandstone",
+    "glass": "sandstone",
+    "carbonate": "limestone",
+    "marble": "limestone",
+    "caco3": "limestone",
+    "titanium": "ti",
+    "wustite": "feo",
+    "acrylic": "pmma",
+}
+
+materialProperties = {
+    "sandstone": {
+        "weights": [0.532565, 0.467435],
+        "symbols": ["O", "Si"],
+        "density": 2.65
+    },
+    "limestone": {
+        "weights": [0.120005, 0.479564, 0.400431],
+        "symbols": ["C", "O", "Ca"],
+        "density": 2.71
+    },
+    "haematite": {
+        "weights": [0.300567, 0.699433],
+        "symbols": ["O", "Fe"],
+        "density": 5.3
+    },
+    "goethite": {
+        "weights": [0.011344, 0.360129, 0.628527],
+        "symbols": ["H", "O", "Fe"],
+        "density": 3.8
+    },
+    "iron ore": {
+        "weights": [0.00473705, 0.32543904, 0.6698239 ],
+        "symbols": ["H", "O", "Fe"],
+        "density": 4.55
+    },
+    "feo": {
+        "weights": [0.223, 0.777],
+        "symbols": ["O", "Fe"],
+        "density": 5.745
+    },
+    "peek": {
+        "weights": [0.041948, 0.791569, 0.166483],
+        "symbols": ["H", "C", "O"],
+        "density": 1.32
+    },
+    "al": {
+        "weights": [1.0],
+        "symbols": ["Al"],
+        "density": 2.70
+    },
+    "xe": {
+        "weights": [1.0],
+        "symbols": ["Xe"],
+        "density": 0.00589
+    },
+    "ti64": {
+        "weights": [0.06, 0.90, 0.04],
+        "symbols": ["Al", "Ti", "V"],
+        "density": 4.43
+    },
+    "hardwood": {# Jarrah wood, not dried
+        "weights": [0.06, 0.52, 0.42],
+        "symbols": ["H", "C", "O"],
+        "density": 0.85
+    },
+    "softwood": {# Pine, not dried
+        "weights": [0.06, 0.52, 0.42],
+        "symbols": ["H", "C", "O"],
+        "density": 0.50
+    },
+    "ti": {
+        "weights": [1.0],
+        "symbols": ["Ti"],
+        "density": 4.51
+    },
+    "pmma": {
+        "weights": [0.080541, 0.599846, 0.319613],
+        "symbols": ["H", "C", "O"],
+        "density": 1.18
+    },
+    "greenalite": {
+        "weights": [0.0094, 0.1744, 0.3748, 0.4414],
+        "symbols": ["H", "Si", "O", "Fe"],
+        "density": 3.08
+    },
+    "dolomite": {
+        "weights": [0.5206, 0.1303, 0.2173, 0.1318],
+        "symbols": ["C", "O", "Ca", "Mg"],
+        "density": 2.84
+    },
+    "pyrex": {
+        "weights": [0.540, 0.377, 0.04, 0.028, 0.011, 0.003],
+        "symbols": ["O", "Si", "B", "Na", "Al", "K"],
+        "density": 2.23
+    },
+    "teflon": {
+        "weights": [0.760, 0.240],
+        "symbols": ["F", "C"],
+        "density": 2.20
+    },
+    "siderite": {
+        "weights": [0.482, 0.1037, 0.4143],
+        "symbols": ["Fe", "C", "O"],
+        "density": 3.96
+    },
+    "pyrite": {
+        "weights": [0.4655, 0.5345],
+        "symbols": ["Fe", "S"],
+        "density": 5.01
+    },
+    "chalcopyrite": {
+        "weights": [0.3043, 0.3463, 0.3494],
+        "symbols": ["Fe", "Cu", "S"],
+        "density": 4.19
+    },
+    "magnetite": {
+        "weights": [0.7236, 0.2764],
+        "symbols": ["Fe", "O"],
+        "density": 5.15
+    }
+}
