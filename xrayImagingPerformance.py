@@ -211,11 +211,27 @@ def getMaterialProperties(material):
             materialWeights = [0.760, 0.240]
             materialSymbols = ["F", "C"]
             dens = 2.20
+        elif mat.lower() == "siderite":
+            materialWeights = [0.482, 0.1037, 0.4143]
+            materialSymbols = ["Fe", "C", "O"]
+            dens = 3.96
+        elif mat.lower() == "pyrite":
+            materialWeights = [0.4655, 0.5345]
+            materialSymbols = ["Fe", "S"]
+            dens = 5.01
+        elif mat.lower() == "chalcopyrite":
+            materialWeights = [0.3043, 0.3463, 0.3494]
+            materialSymbols = ["Fe", "Cu", "S"]
+            dens = 4.19
+        elif mat.lower() == "magnetite":
+            materialWeights = [0.7236, 0.2764]
+            materialSymbols = ["Fe", "O"]
+            dens = 5.15
         else:
             raise Exception(f"Unknown sample material: '{mat}'. Valid materials are: 'sandstone', 'clastic', "
                             f"'limestone', 'carbonate', 'haematite', 'goethite', 'iron ore', 'PEEK', 'Al', 'Xe',"
                             f" 'Ti64', 'titanium', 'glass', 'acrylic', 'feo', 'wustite', 'hardwood', 'softwood',"
-                            f" 'teflon', 'pyrex'.")
+                            f" 'teflon', 'pyrex', 'siderite', 'pyrite', 'chalcopyrite', 'magnetite'.")
         return materialWeights, materialSymbols, dens
 
     if isinstance(material, str):
