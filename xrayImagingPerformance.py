@@ -129,71 +129,71 @@ def getMaterialProperties(material):
             props = mpd.materialProperties[material]
             return props["weights"], props["symbols"], props["density"]
         elif material in mpd.materialNameMapping:
-            canonical_name = mpd.materialNameMapping[material]
-            props = mpd.materialProperties[canonical_name]
+            canonicalName = mpd.materialNameMapping[material]
+            props = mpd.materialProperties[canonicalName]
             return props["weights"], props["symbols"], props["density"]
         else:
-            valid_materials = list(mpd.materialProperties.keys()) + list(mpd.materialNameMapping.keys())
+            validMaterials = list(mpd.materialProperties.keys()) + list(mpd.materialNameMapping.keys())
             raise Exception(f"Unknown sample material: '{material}'. "
-                            f"Valid materials are: {', '.join(valid_materials)}.")
+                            f"Valid materials are: {', '.join(validMaterials)}.")
 
     elif isinstance(material, list):
         if len(material) != 2:
             raise Exception("Composite material input must be a list of two lists: [materials, percentages].")
 
-        materials_list, percentages_list = material
+        materialsList, percentagesList = material
 
-        if not (isinstance(materials_list, list) and isinstance(percentages_list, list)):
+        if not (isinstance(materialsList, list) and isinstance(percentagesList, list)):
             raise Exception("Composite material input must be a list of two lists: [materials, percentages].")
 
-        if len(materials_list) != len(percentages_list):
+        if len(materialsList) != len(percentagesList):
             raise Exception("Materials list and percentages list must have the same length.")
 
-        total_percentage = sum(percentages_list)
-        if not np.isclose(total_percentage, 1.0):
-            raise Exception(f"Percentages must sum to 1.0, but sum to {total_percentage}.")
+        totalPercentage = sum(percentagesList)
+        if not np.isclose(totalPercentage, 1.0):
+            raise Exception(f"Percentages must sum to 1.0, but sum to {totalPercentage}.")
 
         # Initialize dictionaries to accumulate element weights
-        combined_elements = {}
-        combined_density = 0.0
+        combinedElements = {}
+        combinedDensity = 0.0
 
-        for mat, perc in zip(materials_list, percentages_list):
+        for mat, perc in zip(materialsList, percentagesList):
             mat = mat.lower()
             if mat in mpd.materialProperties:
                 props = mpd.materialProperties[mat]
             elif mat in mpd.materialNameMapping:
-                canonical_name = mpd.materialNameMapping[mat]
-                props = mpd.materialProperties[canonical_name]
+                canonicalName = mpd.materialNameMapping[mat]
+                props = mpd.materialProperties[canonicalName]
             else:
-                valid_materials = list(mpd.materialProperties.keys()) + list(mpd.materialNameMapping.keys())
+                validMaterials = list(mpd.materialProperties.keys()) + list(mpd.materialNameMapping.keys())
                 raise Exception(f"Unknown sample material: '{mat}'. "
-                                f"Valid materials are: {', '.join(valid_materials)}.")
+                                f"Valid materials are: {', '.join(validMaterials)}.")
 
-            mat_weights, mat_symbols, mat_dens = props["weights"], props["symbols"], props["density"]
+            matWeights, matSymbols, matDens = props["weights"], props["symbols"], props["density"]
 
             # Accumulate density as weighted average
-            combined_density += perc * mat_dens
+            combinedDensity += perc * matDens
 
             # Accumulate element weights
-            for w, sym in zip(mat_weights, mat_symbols):
-                if sym in combined_elements:
-                    combined_elements[sym] += perc * w
+            for w, sym in zip(matWeights, matSymbols):
+                if sym in combinedElements:
+                    combinedElements[sym] += perc * w
                 else:
-                    combined_elements[sym] = perc * w
+                    combinedElements[sym] = perc * w
 
         # Normalize the combined element weights to sum to 1
-        total_element_weight = sum(combined_elements.values())
-        if total_element_weight == 0:
+        totalElementWeight = sum(combinedElements.values())
+        if totalElementWeight == 0:
             raise Exception("Total element weight is zero. Check material weights and percentages.")
-        for sym in combined_elements:
-            combined_elements[sym] /= total_element_weight
+        for sym in combinedElements:
+            combinedElements[sym] /= totalElementWeight
 
         # Sort elements alphabetically for consistency
-        sorted_elements = sorted(combined_elements.items())
-        materialSymbols = [sym for sym, _ in sorted_elements]
-        materialWeights = [w for _, w in sorted_elements]
+        sortedElements = sorted(combinedElements.items())
+        materialSymbols = [sym for sym, _ in sortedElements]
+        materialWeights = [w for _, w in sortedElements]
 
-        return materialWeights, materialSymbols, combined_density
+        return materialWeights, materialSymbols, combinedDensity
 
     else:
         raise Exception("Input material must be either a string or a list of two lists [materials, percentages].")
