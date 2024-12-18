@@ -57,7 +57,7 @@ def generateBeamHardeningCurve(spectrum,sampleAttPerCm,sampleDiameterMm):
     #bhcData[:,0] is thickness of material in mm
     #bhcData[:,1] is corresponding measured transmission
     tStepMm = 0.1
-    Nt = int(10.0*sampleDiameterMm/tStepMm)
+    Nt = int(sampleDiameterMm/tStepMm)
     bhcData = np.zeros((Nt,2),dtype=float)
     for tc in range(Nt):
         tCurrCm = 0.1*(tc+1)*tStepMm
@@ -73,12 +73,12 @@ def func_powerlaw(x, A, n):
     return A*(x**n)
 
 
-def fitPowerLawToBhcData(bhcData):
+def fitPowerLawToBhcData(bhcData,p0=[1.0,0.8]):
     #bhcData[:,0] is thickness of material in mm
     #bhcData[:,1] is corresponding measured transmission
     x = bhcData[:,0]
     y = -np.log(bhcData[:,1])
-    popt, pcov = curve_fit(func_powerlaw, x, y)
+    popt, pcov = curve_fit(func_powerlaw, x, y, p0=p0)
     A = popt[0]
     n = popt[1]
     return A,n
@@ -96,6 +96,7 @@ def estimateBeamHardening(spectrum,sampleAttPerCm,sampleDiameterMm,plot=False):
         plt.plot(bhcData[:,0],-np.log(bhcData[:,1]),label="data")
         plt.plot(bhcData[:,0],A*(bhcData[:,0]**n),label="fit")
         plt.legend()
+        plt.grid()
         plt.text(0.05, 0.95, f'A={A:.3f}, n={n:.3f}', transform=plt.gca().transAxes, verticalalignment='top')
         plt.show()
     return A,n
