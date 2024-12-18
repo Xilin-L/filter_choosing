@@ -118,9 +118,16 @@ def projectWithBeamHardeningModel(imgIn, A, n, angles=None, vxSzMm=1.0):
     return polyAtt
 
 
-def simulateBH(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=4., kvp=60, filterMaterial='Al',
+def simulateBH(sampleDiameterMm=4., sampleDiameterVx=100, kvp=60, filterMaterial='Al',
                   filterThicknessMm=0.5, materialName='marble', plotIdeal=False,plotBH=False, plotCurve=True,verbose=True):
-
+    '''
+    similate the beam hardening effect for a disk.
+    sampleDiameterVx: diameter of the sample in voxels
+    use the ratio of sampleDiameterMm/sampleDiameterVx to determine the resolution of the image
+    '''
+    Ny = int(sampleDiameterVx*1.2)
+    Nx = int(sampleDiameterVx*1.2)
+    vxSzMm = sampleDiameterMm/sampleDiameterVx
     imgShape = (Ny, Nx)
     img = generateCylinder(imgShape, diameterMm=sampleDiameterMm, vxSzMm=vxSzMm)
 
@@ -135,60 +142,41 @@ def simulateBH(Ny=128, Nx=128, vxSzMm=0.1, sampleDiameterMm=4., kvp=60, filterMa
 
     ### ADD SPECTRUM INFO ###
     energyKeV, spectrum = xs.setSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
+    # energyKeV, spectrum = xs.generateEmittedSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
+
     materialWeights, materialSymbols, dens = xip.getMaterialProperties(materialName)
     sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
     A, n = xip.estimateBeamHardening(spectrum, sampleAttPerCm, sampleDiameterMm, plot=plotCurve)
     if verbose:
         print("BHC parms [A, n] = [%s, %s], bhcFactor = %s" % (A, n, 1. / n))
 
-    sinogram = projectSingleMaterialWithSpectrum(spectrum, sampleAttPerCm, img, angles=None, vxSzMm=vxSzMm)
-    meanAttenuation = np.mean(sinogram) / np.mean(sinogramIdeal)
+    sinogramFP = projectSingleMaterialWithSpectrum(spectrum, sampleAttPerCm, img, angles=None, vxSzMm=vxSzMm)
+    # full physics sinogram
+    meanAttenuation = np.mean(sinogramFP) / np.mean(sinogramIdeal)
     sinogramIdeal *= meanAttenuation
 
     sinogramBH = projectWithBeamHardeningModel(img, A, n, vxSzMm=vxSzMm)
+    # just applying the simple rule, not full physics
 
-    recon = reconstruct(sinogram)
+    tomo = reconstruct(sinogramFP)
     if plotBH: # plot the beam-hardened sinogram and reconstruction
-        plt.imshow(sinogram, "gray")
+        plt.imshow(sinogramFP, "gray")
         plt.show()
-        plt.imshow(recon, "gray")
+        plt.imshow(tomo, "gray")
         plt.show()
 
     if plotCurve:
         plt.plot(sinogramIdeal[:, 0], label="monochrom.")
         plt.plot(sinogramBH[:, 0], label="beam hard.")
-        plt.plot(sinogram[:, 0], label="polychrom.")
+        plt.plot(sinogramFP[:, 0], label="polychrom.")
         plt.grid()
         plt.legend()
         plt.show()
-        plt.plot(recon[Ny // 2, :])
+        plt.plot(tomo[Ny // 2, :])
         plt.show()
 
-    return 1./n, recon, sinogramBH, sinogramIdeal
+    return 1./n, vxSzMm, tomo, sinogramFP
 
-
-def bhcFromProj(vxSzMm=0.1, sampleDiameterMm=4., bhc=1.0,plot=False):
-    # a trivial test to estimate the beam hardening coefficient from a given bhc
-    imgShape = (int(30 * sampleDiameterMm), int(30 * sampleDiameterMm))
-    img = generateCylinder(imgShape, diameterMm=sampleDiameterMm, vxSzMm=vxSzMm)
-    projIdeal = projectWithBeamHardeningModel(img, A=1.0 , n=1.0, angles=[0], vxSzMm=vxSzMm)
-    bhf=1./bhc
-    projBH = projectWithBeamHardeningModel(img, A=1.0 , n=bhf, angles=[0], vxSzMm=vxSzMm)
-
-    A, n = xip.fitPowerLawToBhcData(np.stack((projIdeal[:,0], np.exp(-projBH[:,0])), axis=1))
-    if plot:
-        x = np.arange(100) * np.max(projIdeal[:, 0]) / 100
-        plt.plot(projIdeal[:,0],label="ideal")
-        plt.plot(projBH[:,0],label="BH")
-        plt.grid()
-        plt.legend()
-        plt.show()
-
-        plt.plot(x, A * x ** n, label="fit n = %s" % n)
-        plt.plot(projIdeal[:, 0], projBH[:, 0], "x", label="BH curve")
-        plt.legend()
-        plt.show()
-    return 1./n
 
 
 def idealiseTomo(tomo, threshold=0.4):
@@ -196,50 +184,81 @@ def idealiseTomo(tomo, threshold=0.4):
     return (tomo > threshold).astype(np.float32)
 
 
-def estimateBhcFromTomo(tomo, sino, plot=False, verbose=True, refineData=False):
-    # Estimate the beam hardening coefficient from a tomogram and a sinogram
-    projIdeal = np.sum(idealiseTomo(enforceBinaryImage(tomo)), axis=0)
-    projBH = np.sum(tomo, axis=0)
-    # normalise them to make them comparable
-    projBH /= np.max(projBH)
-    sino[:, 0] /= np.max(sino[:, 0])
-    stackedData = np.stack((projIdeal, np.exp(-projBH)), axis=1)
-    stackedDataSino = np.stack((projIdeal, np.exp(-sino[:, 0])), axis=1)
+def estimateBhcFromTomo(tomo, vxSzMm=0.1, plot=False, verbose=True):
+    # Estimate the beam hardening coefficient from a tomogram
+    tomo[tomo < 0] = 0
 
-    # if refineData:
-    #     stackedData = stackedData[stackedData[:, 0].argsort()]  # Sort by the first column
-    #     _, idx = np.unique(stackedData[:, 0], return_index=True)  # Get the indices of unique first arguments
-    #     stackedData = np.array([stackedData[stackedData[:, 0] == val][-1]
-    #                             for val in np.unique(stackedData[:,0])])
-    #     # Keep only the rows with the largest second argument for the same first argument
+    projIdeal = np.sum(idealiseTomo(enforceBinaryImage(tomo)), axis=0)
+    projIdeal *= vxSzMm # pathlength, normalise to mm
+
+    projBH = np.sum(tomo, axis=0)
+
+    stackedData = np.stack((projIdeal, np.exp(-projBH)), axis=1)
 
     A, n = xip.fitPowerLawToBhcData(stackedData)
-    A2, n2 = xip.fitPowerLawToBhcData(stackedDataSino)
 
     if plot:
-        x = np.arange(100) * np.max(projIdeal) / 100
-        plt.plot(x, A * x ** n, label="fit n = %s" % n)
+        x = np.arange(100) * np.max(projIdeal) / 100 # in 0.1mm
+        bhc=1/n
+        plt.plot(x, A * x ** n, label="fit bhc = %s" % bhc)
         plt.plot(stackedData[:,0], -np.log(stackedData[:, 1]), "x", label="BH curve tomo")
-        plt.plot(x, A2 * x ** n2, label="fit n = %s" % n2)
-        plt.plot(stackedDataSino[:,0], -np.log(stackedDataSino[:, 1]), "x", label="BH curve sino")
+        plt.xlabel("pathlength (mm)")
         plt.legend()
+        plt.grid()
         plt.show()
     if verbose:
         bhc=1./n
-        bhc2=1./n2
-        print("bhc tomo = %s" % bhc, "bhc sino = %s" % bhc2)
-    return 1./n, 1/n2
+        print("bhc tomo = %s" % bhc)
+    return 1./n
 
 
 
 
 if __name__ == "__main__":
 
-    bhc, tomo, sinoBH,_= simulateBH(Ny=400, Nx=400, vxSzMm=0.05, kvp=180,materialName='feo',
-                                    sampleDiameterMm=15.0, plotIdeal=False,plotBH=False, plotCurve=False)
-    estimateBhcFromTomo(tomo,sinoBH, plot=True)
+    '''
+    modified the simulateBH function so the Nx and Ny are determined by sampleDiameter in terms of voxels.
+    difference between points with same depth get smaller as sampleDiameterVx increases.
+
+    discardFirst: not very accurate compared to the original
+    '''
+
+    kvp = 180
+    materialName = 'peek'
 
 
+    ### test the accuracy for a single case ###
+
+    bhc, vxSzMm, tomo,_= simulateBH(sampleDiameterMm=2, sampleDiameterVx=200, kvp=kvp, materialName=materialName,
+                                    plotIdeal=False, plotBH=False, plotCurve=False)
+    bhsEsti=estimateBhcFromTomo(tomo, vxSzMm=vxSzMm, plot=True, verbose=True)
+
+
+    ### generate the estimation curves ###
+
+    # bhcList=[]
+    # bhcEstiList=[]
+    # sampleDiaList = np.arange(3, 16, 1)
+    # sampleVxList = np.arange(10, 200, 20)
+    # for sampleDia in sampleDiaList:
+    #     for sampleVx in sampleVxList:
+    #         bhc, vxSzMm, tomo, _ = simulateBH(sampleDiameterMm=sampleDia, sampleDiameterVx=sampleVx, kvp=kvp,
+    #                                           materialName=materialName,
+    #                                           plotIdeal=False, plotBH=False, plotCurve=False)
+    #         bhsEsti = estimateBhcFromTomo(tomo, vxSzMm=vxSzMm, plot=False, verbose=False)
+    #         bhcList.append(bhc)
+    #         bhcEstiList.append(bhsEsti)
+    #
+    # plt.plot(sampleDiaList, bhcList[sampleVxList.tolist().index(10)::len(sampleVxList)],
+    #              label=f"simulated")
+    # for sampleVx in sampleVxList:
+    #     plt.plot(sampleDiaList, bhcEstiList[sampleVxList.tolist().index(sampleVx)::len(sampleVxList)],
+    #              label=f"estimated (Vx={sampleVx})")
+    #
+    # plt.grid()
+    # plt.legend()
+    # plt.title("BHC estimation, kVp= %s, material= %s" % (kvp, materialName))
+    # plt.show()
 
 
     exit()
