@@ -2,11 +2,8 @@
 
 import numpy as np
 
-import scipy as sp
-from scipy import ndimage
-from scipy.optimize import curve_fit
-
 import matplotlib.pyplot as plt
+import netCDF4 as nc
 
 import spekpy
 
@@ -15,6 +12,7 @@ from larch import xray
 
 import xraySimulation as xs
 import materialPropertiesData as mpd
+import beamHardeningSimulation as bhs
 
 ### What are the requirements for the ideal filter? ###
 # 1 -X- rule of thumb (ROT), want filter to be equivalent to exp(-1) = 0.367 x diameter of sample * sample material * sample density. Maybe start here?
@@ -29,7 +27,7 @@ def estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrum,sampleMaterial,sam
     # estimate fraction of spectrum flux is detected as scatter
     # get material properties
     thicknessAvgCm = 0.075*sampleDiameterMm
-    materialWeights,materialSymbols,dens = getMaterialProperties(sampleMaterial)
+    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
     # estiamte amount of total scatter
     # Start with Compton ('absorption' component)
     sampIncohScat = xs.calcIncohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
@@ -53,151 +51,8 @@ def estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrum,sampleMaterial,sam
     return 100.0*scatEnergyFluence*scatFracDet/np.sum(spectrum)
 
 
-def generateBeamHardeningCurve(spectrum,sampleAttPerCm,sampleDiameterMm):
-    #bhcData[:,0] is thickness of material in mm
-    #bhcData[:,1] is corresponding measured transmission
-    tStepMm = 0.1
-    Nt = int(sampleDiameterMm/tStepMm)
-    bhcData = np.zeros((Nt,2),dtype=float)
-    for tc in range(Nt):
-        tCurrCm = 0.1*(tc+1)*tStepMm
-        sampleTransCurr = np.exp(-sampleAttPerCm*tCurrCm)
-        spectrumCurr = spectrum*sampleTransCurr
-        measTransCurr = np.sum(spectrumCurr)/np.sum(spectrum)
-        bhcData[tc,0] = 10.0*tCurrCm
-        bhcData[tc,1] = measTransCurr
-    return bhcData
 
 
-def func_powerlaw(x, A, n):
-    return A*(x**n)
-
-
-def fitPowerLawToBhcData(bhcData,p0=[1.0,0.8]):
-    #bhcData[:,0] is thickness of material in mm
-    #bhcData[:,1] is corresponding measured transmission
-    x = bhcData[:,0]
-    y = -np.log(bhcData[:,1])
-    popt, pcov = curve_fit(func_powerlaw, x, y, p0=p0)
-    A = popt[0]
-    n = popt[1]
-    return A,n
-
-
-def estimateBeamHardening(spectrum,sampleAttPerCm,sampleDiameterMm,plot=False):
-    # return parameters A,n that fit the beam hardening curve y as y=Ax^n
-    # where x is the material thickness
-    #
-    #bhcData[:,0] is thickness of material in mm
-    #bhcData[:,1] is corresponding measured transmission
-    bhcData = generateBeamHardeningCurve(spectrum,sampleAttPerCm,sampleDiameterMm)
-    A,n = fitPowerLawToBhcData(bhcData)
-    if plot is True:
-        plt.plot(bhcData[:,0],-np.log(bhcData[:,1]),label="data")
-        plt.plot(bhcData[:,0],A*(bhcData[:,0]**n),label="fit")
-        plt.legend()
-        plt.grid()
-        plt.text(0.05, 0.95, f'A={A:.3f}, n={n:.3f}', transform=plt.gca().transAxes, verticalalignment='top')
-        plt.show()
-    return A,n
-
-
-def getMaterialProperties(material):
-    """
-    Retrieves material properties including elemental weight fractions, element symbols, and density.
-    Supports both single materials and composite materials with strict, case-sensitive material names.
-
-    Parameters:
-    - material (str or list):
-        - If str: Name of the material (e.g., "sandstone").
-        - If list:
-            - First element: List of material names (exact case).
-            - Second element: List of corresponding percentages (should sum to 1).
-
-    Returns:
-    - materialWeights (list): Combined weight fractions of elements.
-    - materialSymbols (list): Corresponding element symbols.
-    - dens (float): Combined density of the material.
-
-    Raises:
-    - Exception: If an unknown material is provided, input format is incorrect, or percentages are invalid.
-    """
-
-    if isinstance(material, str):
-        # Single material
-        material = material.lower()
-        if material in mpd.materialProperties:
-            props = mpd.materialProperties[material]
-            return props["weights"], props["symbols"], props["density"]
-        elif material in mpd.materialNameMapping:
-            canonicalName = mpd.materialNameMapping[material]
-            props = mpd.materialProperties[canonicalName]
-            return props["weights"], props["symbols"], props["density"]
-        else:
-            validMaterials = list(mpd.materialProperties.keys()) + list(mpd.materialNameMapping.keys())
-            raise Exception(f"Unknown sample material: '{material}'. "
-                            f"Valid materials are: {', '.join(validMaterials)}.")
-
-    elif isinstance(material, list):
-        if len(material) != 2:
-            raise Exception("Composite material input must be a list of two lists: [materials, percentages].")
-
-        materialsList, percentagesList = material
-
-        if not (isinstance(materialsList, list) and isinstance(percentagesList, list)):
-            raise Exception("Composite material input must be a list of two lists: [materials, percentages].")
-
-        if len(materialsList) != len(percentagesList):
-            raise Exception("Materials list and percentages list must have the same length.")
-
-        totalPercentage = sum(percentagesList)
-        if not np.isclose(totalPercentage, 1.0):
-            raise Exception(f"Percentages must sum to 1.0, but sum to {totalPercentage}.")
-
-        # Initialize dictionaries to accumulate element weights
-        combinedElements = {}
-        combinedDensity = 0.0
-
-        for mat, perc in zip(materialsList, percentagesList):
-            mat = mat.lower()
-            if mat in mpd.materialProperties:
-                props = mpd.materialProperties[mat]
-            elif mat in mpd.materialNameMapping:
-                canonicalName = mpd.materialNameMapping[mat]
-                props = mpd.materialProperties[canonicalName]
-            else:
-                validMaterials = list(mpd.materialProperties.keys()) + list(mpd.materialNameMapping.keys())
-                raise Exception(f"Unknown sample material: '{mat}'. "
-                                f"Valid materials are: {', '.join(validMaterials)}.")
-
-            matWeights, matSymbols, matDens = props["weights"], props["symbols"], props["density"]
-
-            # Accumulate density as weighted average
-            combinedDensity += perc * matDens
-
-            # Accumulate element weights
-            for w, sym in zip(matWeights, matSymbols):
-                if sym in combinedElements:
-                    combinedElements[sym] += perc * w
-                else:
-                    combinedElements[sym] = perc * w
-
-        # Normalize the combined element weights to sum to 1
-        totalElementWeight = sum(combinedElements.values())
-        if totalElementWeight == 0:
-            raise Exception("Total element weight is zero. Check material weights and percentages.")
-        for sym in combinedElements:
-            combinedElements[sym] /= totalElementWeight
-
-        # Sort elements alphabetically for consistency
-        sortedElements = sorted(combinedElements.items())
-        materialSymbols = [sym for sym, _ in sortedElements]
-        materialWeights = [w for _, w in sortedElements]
-
-        return materialWeights, materialSymbols, combinedDensity
-
-    else:
-        raise Exception("Input material must be either a string or a list of two lists [materials, percentages].")
 
 
 def getFilterAttPerCm(energyKeV,filterMaterial="Cu"): # added Cu as an option
@@ -232,7 +87,7 @@ def getRuleOfThumbFilterThickness(kVpeak,filterMaterial="Al", sampleMaterial="sa
     # where D is sampleDiameter and e is 2.7183
     energyKeV,spectrumIn = xs.generateEmittedSpectrum(kVpeak)
     tSampFiltCm = 0.1*np.exp(-1.)*sampleDiameterMm # ROT filter attenuation 
-    materialWeights,materialSymbols,dens = getMaterialProperties(sampleMaterial)
+    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
     sampFiltTrans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, tSampFiltCm)
     spectrumOut = spectrumIn*sampFiltTrans
     measTransSampFilt = np.sum(spectrumOut)/np.sum(spectrumIn)
@@ -267,7 +122,7 @@ def getImagingStatistics(energyKeV, spectrumIn, filterMaterial="Al", filterThick
     # estimate fraction of original flux incident on sample [return 1]
     fluxPerc = 100.0*np.sum(spectrumFilt)/np.sum(spectrumIn)
     # incorporate attenuation by sample
-    materialWeights,materialSymbols,dens = getMaterialProperties(sampleMaterial)
+    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
     tSampCm = 0.1*sampleDiameterMm
     sampTrans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, tSampCm)
     spectrumOut = spectrumFilt*sampTrans
@@ -280,7 +135,7 @@ def getImagingStatistics(energyKeV, spectrumIn, filterMaterial="Al", filterThick
     sampA = -np.log(measTransSamp) # [return 3]
     # estimate BHC factor
     sampAttPerCm = -np.log(sampTrans)/tSampCm
-    A,n = estimateBeamHardening(spectrumFilt,sampAttPerCm,sampleDiameterMm)
+    A,n = bhs.estimateBeamHardening(spectrumFilt,sampAttPerCm,sampleDiameterMm)
     bhcFactor = 1.0/n # [return 4]
     # estimate scatter from sample that hits detector [return 5]
     
@@ -304,7 +159,7 @@ def SnrBySummingFlux(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngl
     '''
     # get material properties
     thicknessAvgCm = 0.075*sampleDiameterMm
-    materialWeights,materialSymbols,dens = getMaterialProperties(sampleMaterial)
+    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
     # calculate signal
     sample_trans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, 0.1*sampleDiameterMm)
     spectrum_trans = spectrum*sample_trans
@@ -337,7 +192,7 @@ def estimateSnrThroughSample(energyKeV, spectrumIn, filterMaterial="Al", filterT
     # get filtered spectrum
     spectrumFilt = getFilteredSpectrum(energyKeV, spectrumIn, filterMaterial, filterThicknessMm)
     # estimate sample transmission/attenuation
-    materialWeights,materialSymbols,dens = getMaterialProperties(sampleMaterial)
+    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
     tSampCm = 0.1*sampleDiameterMm
     sampTrans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, tSampCm)
     spectrumOut = spectrumFilt*sampTrans

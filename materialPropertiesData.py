@@ -1,4 +1,103 @@
 
+import numpy as np
+
+def getMaterialProperties(material):
+    """
+    Retrieves material properties including elemental weight fractions, element symbols, and density.
+    Supports both single materials and composite materials with strict, case-sensitive material names.
+
+    Parameters:
+    - material (str or list):
+        - If str: Name of the material (e.g., "sandstone").
+        - If list:
+            - First element: List of material names (exact case).
+            - Second element: List of corresponding percentages (should sum to 1).
+
+    Returns:
+    - materialWeights (list): Combined weight fractions of elements.
+    - materialSymbols (list): Corresponding element symbols.
+    - dens (float): Combined density of the material.
+
+    Raises:
+    - Exception: If an unknown material is provided, input format is incorrect, or percentages are invalid.
+    """
+
+    if isinstance(material, str):
+        # Single material
+        material = material.lower()
+        if material in materialProperties:
+            props = materialProperties[material]
+            return props["weights"], props["symbols"], props["density"]
+        elif material in materialNameMapping:
+            canonicalName = materialNameMapping[material]
+            props = materialProperties[canonicalName]
+            return props["weights"], props["symbols"], props["density"]
+        else:
+            validMaterials = list(materialProperties.keys()) + list(materialNameMapping.keys())
+            raise Exception(f"Unknown sample material: '{material}'. "
+                            f"Valid materials are: {', '.join(validMaterials)}.")
+
+    elif isinstance(material, list):
+        if len(material) != 2:
+            raise Exception("Composite material input must be a list of two lists: [materials, percentages].")
+
+        materialsList, percentagesList = material
+
+        if not (isinstance(materialsList, list) and isinstance(percentagesList, list)):
+            raise Exception("Composite material input must be a list of two lists: [materials, percentages].")
+
+        if len(materialsList) != len(percentagesList):
+            raise Exception("Materials list and percentages list must have the same length.")
+
+        totalPercentage = sum(percentagesList)
+        if not np.isclose(totalPercentage, 1.0):
+            raise Exception(f"Percentages must sum to 1.0, but sum to {totalPercentage}.")
+
+        # Initialize dictionaries to accumulate element weights
+        combinedElements = {}
+        combinedDensity = 0.0
+
+        for mat, perc in zip(materialsList, percentagesList):
+            mat = mat.lower()
+            if mat in materialProperties:
+                props = materialProperties[mat]
+            elif mat in materialNameMapping:
+                canonicalName = materialNameMapping[mat]
+                props = materialProperties[canonicalName]
+            else:
+                validMaterials = list(materialProperties.keys()) + list(materialNameMapping.keys())
+                raise Exception(f"Unknown sample material: '{mat}'. "
+                                f"Valid materials are: {', '.join(validMaterials)}.")
+
+            matWeights, matSymbols, matDens = props["weights"], props["symbols"], props["density"]
+
+            # Accumulate density as weighted average
+            combinedDensity += perc * matDens
+
+            # Accumulate element weights
+            for w, sym in zip(matWeights, matSymbols):
+                if sym in combinedElements:
+                    combinedElements[sym] += perc * w
+                else:
+                    combinedElements[sym] = perc * w
+
+        # Normalize the combined element weights to sum to 1
+        totalElementWeight = sum(combinedElements.values())
+        if totalElementWeight == 0:
+            raise Exception("Total element weight is zero. Check material weights and percentages.")
+        for sym in combinedElements:
+            combinedElements[sym] /= totalElementWeight
+
+        # Sort elements alphabetically for consistency
+        sortedElements = sorted(combinedElements.items())
+        materialSymbols = [sym for sym, _ in sortedElements]
+        materialWeights = [w for _, w in sortedElements]
+
+        return materialWeights, materialSymbols, combinedDensity
+
+    else:
+        raise Exception("Input material must be either a string or a list of two lists [materials, percentages].")
+
 materialNameMapping = {
     "clastic": "sandstone",
     "glass": "sandstone",

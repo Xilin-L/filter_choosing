@@ -3,13 +3,62 @@ import matplotlib.pyplot as plt
 
 import skimage as ski
 
-import spekpy
-import larch
-from larch import xray
-from skimage.transform import radon
+import scipy as sp
+from scipy import ndimage
+from scipy.optimize import curve_fit
 
 import xraySimulation as xs
-import xrayImagingPerformance as xip
+import materialPropertiesData as mpd
+
+
+
+def generateBeamHardeningCurve(spectrum,sampleAttPerCm,sampleDiameterMm):
+    #bhcData[:,0] is thickness of material in mm
+    #bhcData[:,1] is corresponding measured transmission
+    tStepMm = 0.1
+    Nt = int(sampleDiameterMm/tStepMm)
+    bhcData = np.zeros((Nt,2),dtype=float)
+    for tc in range(Nt):
+        tCurrCm = 0.1*(tc+1)*tStepMm
+        sampleTransCurr = np.exp(-sampleAttPerCm*tCurrCm)
+        spectrumCurr = spectrum*sampleTransCurr
+        measTransCurr = np.sum(spectrumCurr)/np.sum(spectrum)
+        bhcData[tc,0] = 10.0*tCurrCm
+        bhcData[tc,1] = measTransCurr
+    return bhcData
+
+
+def func_powerlaw(x, A, n):
+    return A*(x**n)
+
+
+def fitPowerLawToBhcData(bhcData,p0=[1.0,0.8]):
+    #bhcData[:,0] is thickness of material in mm
+    #bhcData[:,1] is corresponding measured transmission
+    x = bhcData[:,0]
+    y = -np.log(bhcData[:,1])
+    popt, pcov = curve_fit(func_powerlaw, x, y, p0=p0)
+    A = popt[0]
+    n = popt[1]
+    return A,n
+
+
+def estimateBeamHardening(spectrum,sampleAttPerCm,sampleDiameterMm,plot=False):
+    # return parameters A,n that fit the beam hardening curve y as y=Ax^n
+    # where x is the material thickness
+    #
+    #bhcData[:,0] is thickness of material in mm
+    #bhcData[:,1] is corresponding measured transmission
+    bhcData = generateBeamHardeningCurve(spectrum,sampleAttPerCm,sampleDiameterMm)
+    A,n = fitPowerLawToBhcData(bhcData)
+    if plot is True:
+        plt.plot(bhcData[:,0],-np.log(bhcData[:,1]),label="data")
+        plt.plot(bhcData[:,0],A*(bhcData[:,0]**n),label="fit")
+        plt.legend()
+        plt.grid()
+        plt.text(0.05, 0.95, f'A={A:.3f}, n={n:.3f}', transform=plt.gca().transAxes, verticalalignment='top')
+        plt.show()
+    return A,n
 
 
 def generateCylinder(imgShape, vxSzMm=1.0, diameterMm=None, attPerCm=1.0):
@@ -144,9 +193,9 @@ def simulateBH(sampleDiameterMm=4., sampleDiameterVx=100, kvp=60, filterMaterial
     energyKeV, spectrum = xs.setSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
     # energyKeV, spectrum = xs.generateEmittedSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
 
-    materialWeights, materialSymbols, dens = xip.getMaterialProperties(materialName)
+    materialWeights, materialSymbols, dens = mpd.getMaterialProperties(materialName)
     sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
-    A, n = xip.estimateBeamHardening(spectrum, sampleAttPerCm, sampleDiameterMm, plot=plotCurve)
+    A, n = estimateBeamHardening(spectrum, sampleAttPerCm, sampleDiameterMm, plot=plotCurve)
     if verbose:
         print("BHC parms [A, n] = [%s, %s], bhcFactor = %s" % (A, n, 1. / n))
 
@@ -195,7 +244,7 @@ def estimateBhcFromTomo(tomo, vxSzMm=0.1, plot=False, verbose=True):
 
     stackedData = np.stack((projIdeal, np.exp(-projBH)), axis=1)
 
-    A, n = xip.fitPowerLawToBhcData(stackedData)
+    A, n = fitPowerLawToBhcData(stackedData)
 
     if plot:
         x = np.arange(100) * np.max(projIdeal) / 100 # in 0.1mm
@@ -223,18 +272,48 @@ if __name__ == "__main__":
     discardFirst: not very accurate compared to the original
     '''
 
-    kvp = 180
-    materialName = 'peek'
-
+    ### global parameters ###
+    kvp = 80
+    materialName = 'pyrite'
 
     ### test the accuracy for a single case ###
 
-    bhc, vxSzMm, tomo,_= simulateBH(sampleDiameterMm=2, sampleDiameterVx=200, kvp=kvp, materialName=materialName,
-                                    plotIdeal=False, plotBH=False, plotCurve=False)
-    bhsEsti=estimateBhcFromTomo(tomo, vxSzMm=vxSzMm, plot=True, verbose=True)
+    # bhc, vxSzMm, tomo,_= simulateBH(sampleDiameterMm=2, sampleDiameterVx=200, kvp=kvp, materialName=materialName,
+    #                                 plotIdeal=False, plotBH=False, plotCurve=False)
+    # bhsEsti=estimateBhcFromTomo(tomo, vxSzMm=vxSzMm, plot=True, verbose=True)
 
 
     ### generate the estimation curves ###
+
+    bhcDiffList=[]
+    bhcList=[]
+    bhcEstiList=[]
+    sampleDiaList = np.arange(10, 26, 1)
+    for sampleDia in sampleDiaList:
+        bhc, vxSzMm, tomo, _ = simulateBH(sampleDiameterMm=sampleDia, sampleDiameterVx=200, kvp=kvp,
+                                          materialName=materialName,
+                                          plotIdeal=False, plotBH=False, plotCurve=False)
+        bhsEsti = estimateBhcFromTomo(tomo, vxSzMm=vxSzMm, plot=False, verbose=False)
+        bhcDifPerc=np.abs(bhc-bhsEsti)/bhc*100
+        bhcDiffList.append(bhcDifPerc)
+        bhcList.append(bhc)
+        bhcEstiList.append(bhsEsti)
+
+    # plt.plot(bhcList, bhcDiffList,label=f"simulated")
+    # plt.plot(bhcEstiList, bhcDiffList,label=f"estimated")
+    # plt.grid()
+    # plt.legend()
+    # plt.title("BHC percentage error, kVp= %s, material= %s" % (kvp, materialName))
+    # plt.show()
+
+    plt.plot(sampleDiaList, bhcDiffList,label=f"Relative error")
+    plt.grid()
+    plt.legend()
+    plt.title("BHC percentage error, kVp= %s, material= %s" % (kvp, materialName))
+    plt.show()
+
+
+    ### check the convergence with respect to sampleDiameterVx ###
 
     # bhcList=[]
     # bhcEstiList=[]

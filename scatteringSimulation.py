@@ -5,8 +5,9 @@ import netCDF4 as nc
 
 
 import xraySimulation as xs
-import xrayImagingPerformance as xip
 import beamHardeningSimulation as bhs
+import materialPropertiesData as mpd
+
 
 def getRadiusMm(img, voxelSizeMm=0.1, threshold=0.1):
     temp = img-10000 # remove the offsetand the wall
@@ -23,7 +24,7 @@ def transmissionTheoretical(tomoSlice,kvp=120,filterMaterial='Cu', filterThickne
     sampleDiameterMm = 2 * getRadiusMm(tomoSlice, voxelSizeMm=voxelSizeMm, threshold=0.1)
     sampleThicknessCm = 0.1 * sampleDiameterMm
     energyKeV, spectrum = xs.setSpectrum(kvp,filterMaterial,filterThicknessMm)
-    materialWeights, materialSymbols, dens = xip.getMaterialProperties(materialName)
+    materialWeights, materialSymbols, dens = mpd.getMaterialProperties(materialName)
     sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
     specNormalisd = spectrum / np.sum(spectrum)
 
