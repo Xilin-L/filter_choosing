@@ -4,12 +4,18 @@ import os
 import numpy as np
 import glob
 
-def extractMetadata(filePath):
-    """Extract metadata from the specified file."""
+def extractMetadata(directoryPath):
+    """Extract metadata from the specified file in the directory and its subdirectories."""
     keywords = ["diameter", "source_filter_thickness_mm", "voxel_size", "x_ray_energy"]
     results = {keyword: None for keyword in keywords}
 
-    with open(filePath, 'r') as file:
+    # Search for the file 'expt.in' in the directory and subdirectories
+    filePath = glob.glob(os.path.join(directoryPath, '**', 'expt.in'), recursive=True)
+    if not filePath:
+        print("No 'expt.in' file found.")
+        return None, None, None, None
+
+    with open(filePath[0], 'r') as file:
         for line in file:
             for keyword in keywords:
                 if keyword in line:
@@ -27,7 +33,7 @@ def extractMetadata(filePath):
 
 def processFiles(directoryPath, pattern, dtype=np.uint16, shape=(1420, 1436)):
     """Process files matching the pattern and return their average as a NumPy array."""
-    files = glob.glob(os.path.join(directoryPath, pattern))
+    files = glob.glob(os.path.join(directoryPath, '**', pattern), recursive=True)
     data = []
 
     for file in files:
@@ -40,16 +46,36 @@ def processFiles(directoryPath, pattern, dtype=np.uint16, shape=(1420, 1436)):
         print("No files found.")
         return None
 
-def main(directoryPath):
-    fileName = 'expt.in'
-    filePath = os.path.join(directoryPath, fileName)
 
-    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp = extractMetadata(filePath)
+def findMiddleKFFile(directoryPath,dtype=np.uint16, shape=(1420, 1436)):
+    """Find the file containing the pattern 'KF' and take only the middle one if sorted by their name."""
+    files = sorted(glob.glob(os.path.join(directoryPath, '**', '*KF*.raw'), recursive=True))
+
+    if not files:
+        print("No KF files found.")
+        return None
+
+    middle_index = len(files) // 2
+    kfMiddle = np.fromfile(files[middle_index], dtype=dtype).reshape(shape)
+    return kfMiddle
+
+
+def main(directoryPath):
+    """
+    Extract metadata from expt.in, obtain the middle KF projection and average DF and CF data.
+    :param directoryPath: the path that contains all the files to be processed
+    :return: sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage,kfMiddle
+    """
+
+    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp = extractMetadata(directoryPath)
+
 
     dfAverage = processFiles(directoryPath, '*DF*.raw')
     cfAverage = processFiles(directoryPath, '*CF*.raw')
 
-    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage
+    kfMiddle = findMiddleKFFile(directoryPath)
+
+    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage,kfMiddle
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Extract metadata from a file and process DF and CF files.')
@@ -57,7 +83,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     results = main(args.directoryPath)
-    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage = results
+    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage, kfMiddle = results
 
     print(f"sampleDiameterMm: {sampleDiameterMm}")
     print(f"filterThicknessMm: {filterThicknessMm}")
@@ -73,3 +99,8 @@ if __name__ == '__main__':
         print("Average clear field values obtained.")
     else:
         print("No CF files found.")
+
+    if kfMiddle:
+        print(f"Middle KF file: {kfMiddle}")
+    else:
+        print("No KF file found.")
