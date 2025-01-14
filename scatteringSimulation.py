@@ -9,6 +9,35 @@ import beamHardeningSimulation as bhs
 import materialPropertiesData as mpd
 
 
+def estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngleDeg=60.):
+    # estimate fraction of spectrum flux is detected as scatter
+    # get material properties
+    thicknessAvgCm = 0.075*sampleDiameterMm
+    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
+    # estiamte amount of total scatter
+    # Start with Compton ('absorption' component)
+    sampIncohScat = xs.calcIncohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
+    spectrumScat = spectrum*sampIncohScat
+    # Plus Raleigh ('absorption' component after transmission from Compton)
+    sampIncohTrans = xs.calcIncohTransmission(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
+    sampCohScat = xs.calcCohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
+    spectrumScat += spectrum*(sampIncohTrans)*sampCohScat
+    # attenuate total scatter by photo-electric half(thicknessAvg)
+    sampPhotoTrans = xs.calcPhotoTransmission(energyKeV,materialWeights,materialSymbols,dens,0.5*thicknessAvgCm)
+    spectrumScat *= sampPhotoTrans
+    # total scatter energy is:
+    scatEnergyFluence = np.sum(spectrumScat)
+    # assume scatter in all directions, so fraction detected is:
+    scatFracDet = (coneAngleDeg**2)/(360.0**2)
+    # '''
+    # change spectrum to spectrum_trans as we are comparing signal measured to noise in return
+    # '''
+    # sample_trans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, thicknessAvgCm)
+    # spectrum_trans = spectrum*sample_trans
+    return 100.0*scatEnergyFluence*scatFracDet/np.sum(spectrum)
+
+
+
 def getRadiusMm(img, voxelSizeMm=0.1, threshold=0.1):
     temp = img-10000 # remove the offsetand the wall
     temp[temp<0]=0

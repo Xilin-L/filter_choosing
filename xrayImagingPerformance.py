@@ -23,37 +23,6 @@ import beamHardeningSimulation as bhs
 # 6 -X- include some sort of scatter estimate? use larch %flux attenuated by pe vs cs/ts? Want scatter < 2% (at least scatter < half transmisson?)
 
 
-def estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngleDeg=60.):
-    # estimate fraction of spectrum flux is detected as scatter
-    # get material properties
-    thicknessAvgCm = 0.075*sampleDiameterMm
-    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
-    # estiamte amount of total scatter
-    # Start with Compton ('absorption' component)
-    sampIncohScat = xs.calcIncohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
-    spectrumScat = spectrum*sampIncohScat
-    # Plus Raleigh ('absorption' component after transmission from Compton)
-    sampIncohTrans = xs.calcIncohTransmission(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
-    sampCohScat = xs.calcCohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
-    spectrumScat += spectrum*(sampIncohTrans)*sampCohScat
-    # attenuate total scatter by photo-electric half(thicknessAvg)
-    sampPhotoTrans = xs.calcPhotoTransmission(energyKeV,materialWeights,materialSymbols,dens,0.5*thicknessAvgCm)
-    spectrumScat *= sampPhotoTrans
-    # total scatter energy is:
-    scatEnergyFluence = np.sum(spectrumScat) 
-    # assume scatter in all directions, so fraction detected is:
-    scatFracDet = (coneAngleDeg**2)/(360.0**2)
-    # '''
-    # change spectrum to spectrum_trans as we are comparing signal measured to noise in return
-    # '''
-    # sample_trans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, thicknessAvgCm)
-    # spectrum_trans = spectrum*sample_trans
-    return 100.0*scatEnergyFluence*scatFracDet/np.sum(spectrum)
-
-
-
-
-
 
 def getFilterAttPerCm(energyKeV,filterMaterial="Cu"): # added Cu as an option
     if "Al" in filterMaterial:
@@ -128,7 +97,7 @@ def getImagingStatistics(energyKeV, spectrumIn, filterMaterial="Al", filterThick
     spectrumOut = spectrumFilt*sampTrans
     # estimate SNR [return 2]
     # snr = estimateSnr(energyKeV,spectrumOut)
-    snr = SnrBySummingFlux(energyKeV, spectrumFilt, sampleMaterial, sampleDiameterMm, coneAngleDeg)
+    # snr = SnrBySummingFlux(energyKeV, spectrumFilt, sampleMaterial, sampleDiameterMm, coneAngleDeg)
     # estimate sample transmission/attenuation
     measTransSamp = np.sum(spectrumOut)/np.sum(spectrumFilt)
     sampTPerc = 100.0*measTransSamp # [return 2]
@@ -138,66 +107,66 @@ def getImagingStatistics(energyKeV, spectrumIn, filterMaterial="Al", filterThick
     A,n = bhs.estimateBeamHardening(spectrumFilt,sampAttPerCm,sampleDiameterMm)
     bhcFactor = 1.0/n # [return 4]
     # estimate scatter from sample that hits detector [return 5]
+
+    # scatContribPerc = estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrumFilt,sampleMaterial,sampleDiameterMm,coneAngleDeg)
+    return fluxPerc,sampTPerc,sampA,bhcFactor
+
+#
+# def estimateSnr(energyKeV,spectrum,scale=0.00030435,gain=0.003):
+#     # get mean energy of spectrum
+#     meanEnergy = xs.estimateMeanEnergy(energyKeV,spectrum)
+#     # estimate #photons as (flux/gain)/meanEnergy
+#     flux = scale * np.sqrt(np.sum(spectrum))
+#     numPhotons = (flux / gain) / meanEnergy
+#     return np.sqrt(numPhotons)
+
+# def SnrBySummingFlux(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngleDeg=60.):
+#     '''
+#     similar to the estimateMeasuredScatterAsPercentOfFlux function but use
+#     SNR = sum(spectrum_transmitted * detector efficiency)/
+#           sqrt(sum(spectrum_scattered * detector efficiency))
+#     '''
+#     # get material properties
+#     thicknessAvgCm = 0.075*sampleDiameterMm
+#     materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
+#     # calculate signal
+#     sample_trans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, 0.1*sampleDiameterMm)
+#     spectrum_trans = spectrum*sample_trans
+#     signal = np.sum(xs.detectedSpectrum(energyKeV,spectrum_trans))
+#
+#     # estiamte amount of total scatter
+#     # Start with Compton ('absorption' component)
+#     sampIncohScat = xs.calcIncohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
+#     spectrumScat = spectrum*sampIncohScat
+#     # Plus Raleigh ('absorption' component after transmission from Compton)
+#     sampIncohTrans = xs.calcIncohTransmission(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
+#     sampCohScat = xs.calcCohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
+#     spectrumScat += spectrum*(sampIncohTrans)*sampCohScat
+#     # attenuate total scatter by photo-electric half(thicknessAvg)
+#     sampPhotoTrans = xs.calcPhotoTransmission(energyKeV,materialWeights,materialSymbols,dens,0.5*thicknessAvgCm)
+#     spectrumScat *= sampPhotoTrans
+#     # total scatter that detectable is:
+#     noise_total = np.sum(xs.detectedSpectrum(energyKeV, spectrumScat))
+#     # assume scatter in all directions, so fraction detected is:
+#     scatFracDet = (coneAngleDeg**2)/(360.0**2)
+#     noise_detected = np.sqrt(noise_total*scatFracDet+signal)
+#
+#     return signal/(noise_detected)
     
-    scatContribPerc = estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrumFilt,sampleMaterial,sampleDiameterMm,coneAngleDeg)
-    return fluxPerc,snr,sampTPerc,sampA,bhcFactor,scatContribPerc
 
 
-def estimateSnr(energyKeV,spectrum,scale=0.00030435,gain=0.003):
-    # get mean energy of spectrum
-    meanEnergy = xs.estimateMeanEnergy(energyKeV,spectrum)
-    # estimate #photons as (flux/gain)/meanEnergy
-    flux = scale * np.sqrt(np.sum(spectrum))
-    numPhotons = (flux / gain) / meanEnergy
-    return np.sqrt(numPhotons)
-
-def SnrBySummingFlux(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngleDeg=60.):
-    '''
-    similar to the estimateMeasuredScatterAsPercentOfFlux function but use
-    SNR = sum(spectrum_transmitted * detector efficiency)/
-          sqrt(sum(spectrum_scattered * detector efficiency))
-    '''
-    # get material properties
-    thicknessAvgCm = 0.075*sampleDiameterMm
-    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
-    # calculate signal
-    sample_trans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, 0.1*sampleDiameterMm)
-    spectrum_trans = spectrum*sample_trans
-    signal = np.sum(xs.detectedSpectrum(energyKeV,spectrum_trans))
-
-    # estiamte amount of total scatter
-    # Start with Compton ('absorption' component)
-    sampIncohScat = xs.calcIncohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
-    spectrumScat = spectrum*sampIncohScat
-    # Plus Raleigh ('absorption' component after transmission from Compton)
-    sampIncohTrans = xs.calcIncohTransmission(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
-    sampCohScat = xs.calcCohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)
-    spectrumScat += spectrum*(sampIncohTrans)*sampCohScat
-    # attenuate total scatter by photo-electric half(thicknessAvg)
-    sampPhotoTrans = xs.calcPhotoTransmission(energyKeV,materialWeights,materialSymbols,dens,0.5*thicknessAvgCm)
-    spectrumScat *= sampPhotoTrans
-    # total scatter that detectable is:
-    noise_total = np.sum(xs.detectedSpectrum(energyKeV, spectrumScat))
-    # assume scatter in all directions, so fraction detected is:
-    scatFracDet = (coneAngleDeg**2)/(360.0**2)
-    noise_detected = np.sqrt(noise_total*scatFracDet+signal)
-
-    return signal/(noise_detected)
-    
-
-
-def estimateSnrThroughSample(energyKeV, spectrumIn, filterMaterial="Al", filterThicknessMm=2.0, 
-                             sampleMaterial="sandstone",sampleDiameterMm=15.):
-    # estimate SNR in darkest region of radiograph as #photons / sqrt(#photons) = sqrt(#photons)
-    # get filtered spectrum
-    spectrumFilt = getFilteredSpectrum(energyKeV, spectrumIn, filterMaterial, filterThicknessMm)
-    # estimate sample transmission/attenuation
-    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
-    tSampCm = 0.1*sampleDiameterMm
-    sampTrans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, tSampCm)
-    spectrumOut = spectrumFilt*sampTrans
-    snr = estimateSnr(energyKeV,spectrumOut)
-    return snr
+# def estimateSnrThroughSample(energyKeV, spectrumIn, filterMaterial="Al", filterThicknessMm=2.0,
+#                              sampleMaterial="sandstone",sampleDiameterMm=15.):
+#     # estimate SNR in darkest region of radiograph as #photons / sqrt(#photons) = sqrt(#photons)
+#     # get filtered spectrum
+#     spectrumFilt = getFilteredSpectrum(energyKeV, spectrumIn, filterMaterial, filterThicknessMm)
+#     # estimate sample transmission/attenuation
+#     materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
+#     tSampCm = 0.1*sampleDiameterMm
+#     sampTrans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, tSampCm)
+#     spectrumOut = spectrumFilt*sampTrans
+#     snr = estimateSnr(energyKeV,spectrumOut)
+#     return snr
 
 
 def getRotFilterImageStatsPerkVp(filterMaterial,sampleMaterial="sandstone",sampleDiameterMm=25.,kVPeakMin=160.,kVPeakMax=300.,coneAngleDeg=50.):
@@ -205,11 +174,11 @@ def getRotFilterImageStatsPerkVp(filterMaterial,sampleMaterial="sandstone",sampl
     energy = []
     tFiltMm = []
     flux = []
-    snr = []
+    # snr = []
     sampT = []
     sampA = []
     bhcFactor = []
-    scatContrib = []
+    # scatContrib = []
     for kVpeak in np.arange(kVPeakMin,kVPeakMax,10):
         energy.append(kVpeak)
         t = getRuleOfThumbFilterThickness(kVpeak,filterMaterial,sampleMaterial,sampleDiameterMm)
@@ -217,12 +186,10 @@ def getRotFilterImageStatsPerkVp(filterMaterial,sampleMaterial="sandstone",sampl
         energyKeV,spectrumIn = xs.generateEmittedSpectrum(kVpeak)
         imgStat = getImagingStatistics(energyKeV,spectrumIn,filterMaterial,t,sampleMaterial,sampleDiameterMm,coneAngleDeg)
         flux.append(imgStat[0])
-        snr.append(imgStat[1])
-        sampT.append(imgStat[2])
-        sampA.append(imgStat[3])
-        bhcFactor.append(imgStat[4])
-        scatContrib.append(imgStat[5])
-        print("kVp: %3d | t (mm): %4.1f | flux (%%): %4.1f | SNR: %4.1f | sample Trans (%%): %4.1f | sample Att: %4.1f | BHC factor: %4.2f | scat contrib. (%%): %8.6f"%(energy[-1],tFiltMm[-1],flux[-1],snr[-1],sampT[-1],sampA[-1],bhcFactor[-1],scatContrib[-1]))
+        sampT.append(imgStat[1])
+        sampA.append(imgStat[2])
+        bhcFactor.append(imgStat[3])
+        print("kVp: %3d | t (mm): %4.1f | flux (%%): %4.1f | sample Trans (%%): %4.1f | sample Att: %4.1f | BHC factor: %4.2f "%(energy[-1],tFiltMm[-1],flux[-1],sampT[-1],sampA[-1],bhcFactor[-1]))
 
     return
 
@@ -253,13 +220,13 @@ def statsDifFiltThickness(kvp, sampleMaterial='FeO', sampleThicknessMm=12.0,
                                        sampleThicknessMm)
         filterThicknesses.append(filterThicknessMm)
         flux.append(imgStat[0])
-        sampT.append(imgStat[2])
-        bhcFactors.append(imgStat[4])  # BHC factor is the 5th element in the returned tuple
+        sampT.append(imgStat[1])
+        bhcFactors.append(imgStat[3])
         print(
             f"Filter Thickness: {filterThicknessMm:.2f} mm | Flux: {imgStat[0]:.2f}% "
             # f"| SNR: {imgStat[1]:.2f} "
-            f"| Sample Transmission: {imgStat[2]:.2f}% | Sample Attenuation: {imgStat[3]:.2f} "
-            f"| BHC Factor: {imgStat[4]:.2f} | Scatter Contribution: {imgStat[5]:.6f}%")
+            f"| Sample Transmission: {imgStat[2]:.2f}% | Sample Attenuation: {imgStat[1]:.2f} "
+            f"| BHC Factor: {imgStat[3]:.2f} ")
     if plot:
         plt.figure()
         plt.plot(filterThicknesses, bhcFactors, marker='o', label='BHC Factor')
