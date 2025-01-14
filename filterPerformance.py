@@ -50,6 +50,16 @@ def getFilteredSpectrum(energyKeV, spectrumIn, filterMaterial="Al", filterThickn
     return spectrumIn*filtTrans
 
 
+def setSpectrum(kvp, filterMaterial='Al', filterThicknessMm=0.5, plot=False):
+    # spectrum filtered and detected
+    energyKeV, spectrumIn = xs.generateEmittedSpectrum(kvp, filterThicknessMm=0.0)
+    spectrumFilt = getFilteredSpectrum(energyKeV, spectrumIn, filterMaterial, filterThicknessMm)
+    spectrumDet = xs.detectedSpectrum(energyKeV, spectrumFilt)
+    if plot is True:
+        xs.plotSpectrum(energyKeV, spectrumDet, title="Spectrum at the detector")
+    return energyKeV, spectrumDet
+
+
 def getRuleOfThumbFilterThickness(kVpeak,filterMaterial="Al", sampleMaterial="sandstone", sampleDiameterMm=25.0, 
                                   max_tFiltMm = 9.0):
     # rule of thumb for filter thickness is that which gives equivalent attenuation as D/e thickness of the sample

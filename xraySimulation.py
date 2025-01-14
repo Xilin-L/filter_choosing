@@ -211,13 +211,6 @@ def detectedSpectrum(energyKeV, spectrumIn, cameraLengthMm=300, scintType="CsI")
     spectrumOut *= absorp
     return spectrumOut
 
-def setSpectrum(kvp, filterMaterial='Al', filterThicknessMm=0.5, plot=False):
-    # spectrum filtered and detected
-    energyKeV, spectrumIn = generateEmittedSpectrum(kvp, filterMaterial, filterThicknessMm)
-    spectrumDet = detectedSpectrum(energyKeV, spectrumIn)
-    if plot is True:
-        plotSpectrum(energyKeV, spectrumDet, title="Spectrum at the detector")
-    return energyKeV, spectrumDet
 
 
 def plotSpectrum(energyKeV,spectrum,title=None):
