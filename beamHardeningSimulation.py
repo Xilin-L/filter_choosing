@@ -9,6 +9,7 @@ from scipy.optimize import curve_fit
 
 import xraySimulation as xs
 import materialPropertiesData as mpd
+import filterPerformance
 
 
 
@@ -24,7 +25,7 @@ def generateBeamHardeningCurve(spectrum,sampleAttPerCm,sampleDiameterMm):
         spectrumCurr = spectrum*sampleTransCurr
         measTransCurr = np.sum(spectrumCurr)/np.sum(spectrum)
         bhcData[tc,0] = 10.0*tCurrCm
-        bhcData[tc,1] = measTransCurr
+        bhcData[tc,1] = -np.log(measTransCurr)
     return bhcData
 
 
@@ -36,7 +37,7 @@ def fitPowerLawToBhcData(bhcData,p0=[1.0,0.8]):
     #bhcData[:,0] is thickness of material in mm
     #bhcData[:,1] is corresponding measured transmission
     x = bhcData[:,0]
-    y = -np.log(bhcData[:,1])
+    y = bhcData[:,1]
     popt, pcov = curve_fit(func_powerlaw, x, y, p0=p0)
     A = popt[0]
     n = popt[1]
@@ -52,7 +53,7 @@ def estimateBeamHardening(spectrum,sampleAttPerCm,sampleDiameterMm,plot=False):
     bhcData = generateBeamHardeningCurve(spectrum,sampleAttPerCm,sampleDiameterMm)
     A,n = fitPowerLawToBhcData(bhcData)
     if plot is True:
-        plt.plot(bhcData[:,0],-np.log(bhcData[:,1]),label="data")
+        plt.plot(bhcData[:,0],bhcData[:,1],label="data")
         plt.plot(bhcData[:,0],A*(bhcData[:,0]**n),label="fit")
         plt.legend()
         plt.grid()
@@ -190,8 +191,8 @@ def simulateBH(sampleDiameterMm=4., sampleDiameterVx=100, kvp=60, filterMaterial
         plt.show()
 
     ### ADD SPECTRUM INFO ###
-    energyKeV, spectrum = xs.setSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
-    # energyKeV, spectrum = xs.generateEmittedSpectrum(kvp=kvp, filterMaterial=filterMaterial, filterThicknessMm=filterThicknessMm)
+    energyKeV, spectrum = filterPerformance.setSpectrum(kvp=kvp, filterMaterial=filterMaterial,
+                                                        filterThicknessMm=filterThicknessMm)
 
     materialWeights, materialSymbols, dens = mpd.getMaterialProperties(materialName)
     sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
@@ -242,7 +243,7 @@ def estimateBhcFromTomo(tomo, vxSzMm=0.1, plot=False, verbose=True):
 
     projBH = np.sum(tomo, axis=0)
 
-    stackedData = np.stack((projIdeal, np.exp(-projBH)), axis=1)
+    stackedData = np.stack((projIdeal, projBH), axis=1)
 
     A, n = fitPowerLawToBhcData(stackedData)
 
@@ -250,7 +251,7 @@ def estimateBhcFromTomo(tomo, vxSzMm=0.1, plot=False, verbose=True):
         x = np.arange(100) * np.max(projIdeal) / 100 # in 0.1mm
         bhc=1/n
         plt.plot(x, A * x ** n, label="fit bhc = %s" % bhc)
-        plt.plot(stackedData[:,0], -np.log(stackedData[:, 1]), "x", label="BH curve tomo")
+        plt.plot(stackedData[:,0], stackedData[:, 1], "x", label="BH curve tomo")
         plt.xlabel("pathlength (mm)")
         plt.legend()
         plt.grid()
