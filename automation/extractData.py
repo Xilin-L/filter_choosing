@@ -3,6 +3,7 @@ import argparse
 import os
 import numpy as np
 import glob
+import netCDF4 as nc
 
 def extractMetadata(directoryPath):
     """Extract metadata from the specified file in the directory and its subdirectories."""
@@ -31,7 +32,7 @@ def extractMetadata(directoryPath):
 
     return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp
 
-def processFiles(directoryPath, pattern, dtype=np.uint16, shape=(1420, 1436)):
+def processFiles(directoryPath, pattern, shape, dtype=np.uint16):
     """Process files matching the pattern and return their average as a NumPy array."""
     files = glob.glob(os.path.join(directoryPath, '**', pattern), recursive=True)
     data = []
@@ -47,7 +48,7 @@ def processFiles(directoryPath, pattern, dtype=np.uint16, shape=(1420, 1436)):
         return None
 
 
-def findMiddleKFFile(directoryPath,dtype=np.uint16, shape=(1420, 1436)):
+def findMiddleKFFile(directoryPath, shape,dtype=np.uint16):
     """Find the file containing the pattern 'KF' and take only the middle one if sorted by their name."""
     files = sorted(glob.glob(os.path.join(directoryPath, '**', '*KF*.raw'), recursive=True))
 
@@ -60,7 +61,7 @@ def findMiddleKFFile(directoryPath,dtype=np.uint16, shape=(1420, 1436)):
     return kfMiddle
 
 
-def main(directoryPath):
+def extractAllData(directoryPath,shape, offset=10000):
     """
     Extract metadata from expt.in, obtain the middle KF projection and average DF and CF data.
     :param directoryPath: the path that contains all the files to be processed
@@ -70,20 +71,31 @@ def main(directoryPath):
     sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp = extractMetadata(directoryPath)
 
 
-    dfAverage = processFiles(directoryPath, '*DF*.raw')
-    cfAverage = processFiles(directoryPath, '*CF*.raw')
+    dfAverage = processFiles(directoryPath, '*DF*.raw', shape=shape)
+    cfAverage = processFiles(directoryPath, '*CF*.raw', shape=shape)
 
-    kfMiddle = findMiddleKFFile(directoryPath)
+    kfMiddle = findMiddleKFFile(directoryPath,shape=shape)
 
-    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage,kfMiddle
+    tomoFilePath = glob.glob(os.path.join(directoryPath, '**', 'tomoLoRes.nc'), recursive=True)
+    if not tomoFilePath:
+        print("No 'tomoLoRes.nc' file found.")
+        tomoLoRes = None
+    else:
+        tomoData = np.nan_to_num(
+            np.array(nc.Dataset(tomoFilePath[0]).variables['tomo'][:], dtype=np.float32, copy=True), nan=0.0)
+        tomoLoRes = np.copy(tomoData) - offset  # shift back the values
+        tomoLoRes[tomoLoRes < 0] = 0  # Set negative values to 0
+
+
+    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage,kfMiddle, tomoLoRes
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Extract metadata from a file and process DF and CF files.')
     parser.add_argument('directoryPath', type=str, help='Path to the directory containing the files')
     args = parser.parse_args()
 
-    results = main(args.directoryPath)
-    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage, kfMiddle = results
+    results = extractAllData(args.directoryPath)
+    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage, kfMiddle, tomoLoRes = results
 
     print(f"sampleDiameterMm: {sampleDiameterMm}")
     print(f"filterThicknessMm: {filterThicknessMm}")
