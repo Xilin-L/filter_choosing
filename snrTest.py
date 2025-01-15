@@ -280,63 +280,67 @@ def calcNoiseStdv(img,stdFiltRangePx=1,plotData=False):
 
 
 
-def estimateSNR(img,kernelRangePx=1,plotData=False):
+def estimateSNR(img, kernelRangePx=1, plotData=False, verbose=False, mask=False, radiusFraction=1.0):
+    if mask:
+        # only contains the sample and a small ring around it
+        imgFiltered = np.copy(img)
+        center = np.array(imgFiltered.shape) // 2
+        distance_from_center = np.sqrt(
+            ((np.indices(imgFiltered.shape) - center[:, None, None]) ** 2).sum(axis=0))
+        imgFiltered[(imgFiltered < 0) | (distance_from_center > center[0] * radiusFraction)] = np.nan  # Set negative values and values away from center to NaN
+        img = imgFiltered
 
-    print("Using size = %s for a median filter and local std. dev. estimates:"%(2*kernelRangePx+1))
+    dataRange = calcDataRange(img, kernelRangePx, plotData)
+    noiseStdv = calcNoiseStdv(img, kernelRangePx, plotData)
+    snr = dataRange / noiseStdv
 
-    dataRange = calcDataRange(img,kernelRangePx,plotData)
-
-    print("data range = %s"%(dataRange))
-
-    noiseStdv = calcNoiseStdv(img,kernelRangePx,plotData)
-
-    print("noise stdv = %s"%(noiseStdv))
-
-    snr = dataRange/noiseStdv
-
-    print("SNR = %s"%(snr))
+    if verbose:
+        print("Using size = %s for a median filter and local std. dev. estimates:" % (2 * kernelRangePx + 1))
+        print("data range = %s" % (dataRange))
+        print("noise stdv = %s" % (noiseStdv))
+        print("SNR = %s" % (snr))
 
     return snr
 
 
 
 # analyse .nc file
-import netCDF4 as nc
-
-def tomoSliceSNR(nc_file, plot=False, kernelRangePx=1):
-    tomoSlice = nc.Dataset(nc_file)
-    tomoData = np.array(tomoSlice.variables['tomo'][:], dtype=np.float32, copy=True)
-
-    # Determine the dimension with length 1
-    data_dim = np.argmin(tomoData.shape)
-
-    # Reshape the data to have the data dimension last
-    tomoData = np.moveaxis(tomoData, data_dim, -1)
-
-    if plot:
-        # Plot the grayscale image
-        tomoDataPlot = np.copy(tomoData) - 10000  # shift does not matter in the SNR calculation though
-        tomoDataPlot[tomoDataPlot < 0] = 0  # Set negative values to zero
-        plt.imshow(tomoDataPlot, cmap='gray')
-        plt.colorbar(label='Value')
-        plt.title('Grayscale Plot of Data Array')
-        plt.show()
-
-    # Estimate the SNR
-    if 'tomoSliceZ' in tomoSlice.filepath():
-        # to remove the container walls for the Z data
-        tomoDataFiltered = np.copy(tomoData)
-        center = np.array(tomoDataFiltered.shape) // 2
-        distance_from_center = np.sqrt(
-            ((np.indices(tomoDataFiltered.shape) - center[:, None, None, None]) ** 2).sum(axis=0))
-        tomoDataFiltered[(tomoDataFiltered < 0) | (
-                distance_from_center > center[0])] = np.nan  # Set negative values and values away from center to zero
-
-        snr = estimateSNR(tomoDataFiltered, kernelRangePx, plot)
-    else:
-        snr = estimateSNR(tomoData, kernelRangePx, plot)
-
-    return snr
+# import netCDF4 as nc
+#
+# def tomoSliceSNR(nc_file, plot=False, kernelRangePx=1):
+#     tomoSlice = nc.Dataset(nc_file)
+#     tomoData = np.array(tomoSlice.variables['tomo'][:], dtype=np.float32, copy=True)
+#
+#     # Determine the dimension with length 1
+#     data_dim = np.argmin(tomoData.shape)
+#
+#     # Reshape the data to have the data dimension last
+#     tomoData = np.moveaxis(tomoData, data_dim, -1)
+#
+#     if plot:
+#         # Plot the grayscale image
+#         tomoDataPlot = np.copy(tomoData) - 10000  # shift does not matter in the SNR calculation though
+#         tomoDataPlot[tomoDataPlot < 0] = 0  # Set negative values to zero
+#         plt.imshow(tomoDataPlot, cmap='gray')
+#         plt.colorbar(label='Value')
+#         plt.title('Grayscale Plot of Data Array')
+#         plt.show()
+#
+#     # Estimate the SNR
+#     if 'tomoSliceZ' in tomoSlice.filepath():
+#         # to remove the container walls for the Z data
+#         tomoDataFiltered = np.copy(tomoData)
+#         center = np.array(tomoDataFiltered.shape) // 2
+#         distance_from_center = np.sqrt(
+#             ((np.indices(tomoDataFiltered.shape) - center[:, None, None, None]) ** 2).sum(axis=0))
+#         tomoDataFiltered[(tomoDataFiltered < 0) | (
+#                 distance_from_center > center[0])] = np.nan  # Set negative values and values away from center to zero
+#
+#         snr = estimateSNR(tomoDataFiltered, kernelRangePx, plot)
+#     else:
+#         snr = estimateSNR(tomoData, kernelRangePx, plot)
+#
+#     return snr
 
 
 
