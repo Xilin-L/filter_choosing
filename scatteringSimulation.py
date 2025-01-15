@@ -7,6 +7,7 @@ import netCDF4 as nc
 import xraySimulation as xs
 import beamHardeningSimulation as bhs
 import materialPropertiesData as mpd
+import filterPerformance
 
 
 def estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngleDeg=60.):
@@ -38,8 +39,8 @@ def estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrum,sampleMaterial,sam
 
 
 
-def getRadiusMm(img, voxelSizeMm=0.1, threshold=0.1):
-    temp = img-10000 # remove the offsetand the wall
+def getRadiusMm(img, voxelSizeMm=0.1, threshold=0.1, offset=10000):
+    temp = img-offset # remove the offsetand the wall
     temp[temp<0]=0
     # look at the actual tomo to change the threshold
     imgIdealised=bhs.idealiseTomo(bhs.enforceBinaryImage(temp),threshold=threshold)
@@ -49,10 +50,10 @@ def getRadiusMm(img, voxelSizeMm=0.1, threshold=0.1):
 
 
 def transmissionTheoretical(tomoSlice,kvp=120,filterMaterial='Cu', filterThicknessMm=0.5,
-                            materialName='feo', voxelSizeMm=0.1):
-    sampleDiameterMm = 2 * getRadiusMm(tomoSlice, voxelSizeMm=voxelSizeMm, threshold=0.1)
+                            materialName='feo', voxelSizeMm=0.1,offset=10000):
+    sampleDiameterMm = 2 * getRadiusMm(tomoSlice, voxelSizeMm=voxelSizeMm, threshold=0.1, offset=offset)
     sampleThicknessCm = 0.1 * sampleDiameterMm
-    energyKeV, spectrum = xs.setSpectrum(kvp,filterMaterial,filterThicknessMm)
+    energyKeV, spectrum = filterPerformance.setSpectrum(kvp,filterMaterial,filterThicknessMm)
     materialWeights, materialSymbols, dens = mpd.getMaterialProperties(materialName)
     sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
     specNormalisd = spectrum / np.sum(spectrum)
@@ -61,7 +62,7 @@ def transmissionTheoretical(tomoSlice,kvp=120,filterMaterial='Cu', filterThickne
                    * np.exp(-sampleAttPerCm[:, np.newaxis, np.newaxis] * sampleThicknessCm),
                    axis=0)
     # sampleTransmission = np.exp(-sampleAttPerCm*sampleThicknessCm)
-    return sampleTransmission.flatten()[0]
+    return sampleTransmission.flatten()[0], sampleDiameterMm
 
 
 def normaliseProj(proj,clearField,darkField):
@@ -70,6 +71,24 @@ def normaliseProj(proj,clearField,darkField):
     projNorm[projNorm > 1]=1
     projSmooth=sp.ndimage.gaussian_filter(projNorm,2)
     return projSmooth
+
+
+def calcScatteringFromData(kf, cf, df, tomoSlice, kvp, filterMaterial, filterThicknessMm,
+                      sampleMaterial, vxSizeMm,offset=10000):
+    projSmooth = normaliseProj(kf, cf, df)
+    midIdx = projSmooth.shape[0] // 2
+    choppedProj = projSmooth[midIdx - 100:midIdx + 100, :]
+    # assume the projection at the center is the smallest value in the image
+    transExpe = np.min(choppedProj)
+
+    transTheo, EstimatedSampleDiameterMm = transmissionTheoretical(tomoSlice, kvp=kvp,
+                                                                      filterMaterial=filterMaterial,
+                                                                      filterThicknessMm=filterThicknessMm,
+                                                                      materialName=sampleMaterial,
+                                                                      voxelSizeMm=vxSizeMm, offset=offset)
+    result = transExpe - transTheo
+
+    return transExpe, transTheo, EstimatedSampleDiameterMm, result
 
 
 if __name__ == '__main__':
@@ -89,33 +108,19 @@ if __name__ == '__main__':
         '/home/xilin/projects/recon_ws/AM/AM_Kingston_BH_38mmCaCO3_SFT/proju16_raw/rawfiles_DF0000/expt_DF000000.raw',
         dtype=np.uint16).reshape((1420, 1436))
 
-    projSmooth=normaliseProj(proj,clearField,darkField)
-    midIdx=projSmooth.shape[0]//2
-    choppedProj=projSmooth[midIdx-100:midIdx+100,:]
-
-    # plt.imshow(choppedProj)
-    # plt.show()
-
-    # assume the projection at the center is the smallest value in the image
-    transExpe=np.min(choppedProj)
-    print("Experimental transmission = %s" %transExpe)
-
-
-
     tomo = np.array(nc.Dataset('/home/xilin/projects/recon_ws/AM/AM_Kingston_BH_38mmCaCO3_SFT/tomoLoRes.nc'
                                ).variables['tomo'][:], dtype=np.float32, copy=True)
 
     tomoMidIdx=tomo.shape[0]//2
     tomoSlice=tomo[tomoMidIdx]
-    transTheo = transmissionTheoretical(tomoSlice, kvp=100, filterMaterial='Al', filterThicknessMm=0.5,
-                                        materialName='marble', voxelSizeMm=0.123)
+
+    transExpe, transTheo, EstimatedSampleDiameterMm, result = \
+        calcScatteringFromData(proj, clearField, darkField, tomoSlice, 100, 'Al',
+                               0.5, 'marble', 0.123, offset=10000)
+
+    print("Experimental transmission = %s" %transExpe)
     print("Theoretical transmission = %s" %transTheo)
-
-    diameterMm= 2 * getRadiusMm(tomoSlice, voxelSizeMm=0.123, threshold=0.1)
-    print("Diameter of the sample is %s mm" % diameterMm)
-
-
-    result=transExpe-transTheo
+    print("Diameter of the sample is %s mm" % EstimatedSampleDiameterMm)
     print("Scattering contribution = %s" %result)
 
 
