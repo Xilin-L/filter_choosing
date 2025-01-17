@@ -84,8 +84,8 @@ def getDecorrMax(d):
     Ai = d[ri]
     return ri,Ai
 
-def getDecorrLocalMax(d):
-    rPeaks,_ = sp.signal.find_peaks(d)
+def getDecorrLocalMax(d,prominence=0.01,width=10, distance=10):
+    rPeaks,_ = sp.signal.find_peaks(d, prominence=prominence, width=width, distance=distance)
     if rPeaks.size:
         dPeaks = d[rPeaks]
         p = np.argmax(dPeaks)
@@ -99,7 +99,8 @@ def getDecorrLocalMax(d):
 def unsharpMask(img,sigma):
     return img - sp.ndimage.gaussian_filter(img,sigma)
 
-def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=False,title=None):
+def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=False,title=None,
+                      prominence=0.01,width=10, distance=10, verbose=False):
     # max = np.max(d)
     # OR
     # geoMax = np.max(r*d)
@@ -111,7 +112,7 @@ def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=Fal
         sigma = sList[sc]
         imgUnsharp = unsharpMask(img, sigma)
         di = getDecorrCurve(imgUnsharp)
-        rPxi, Ai = getDecorrLocalMax(di)
+        rPxi, Ai = getDecorrLocalMax(di, prominence=prominence, width=width, distance=distance)
         currVal = rPxi
         if geometricMax:
             currVal *= Ai
@@ -121,7 +122,8 @@ def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=Fal
         results = list(executor.map(process_sigma, range(Ng)))
 
     for currVal, rPxi, Ai, sigma, di in results:
-        print("r: %3d | A: %10f | Ar: %10f | sigmaPx: %0.2f" % (rPxi, Ai, Ai * rPxi, sigma))
+        if verbose:
+            print("r: %3d | A: %10f | Ar: %10f | sigmaPx: %0.2f" % (rPxi, Ai, Ai * rPxi, sigma))
         if currVal > maxVal:
             maxVal = currVal
             maxPos = rPxi
@@ -142,7 +144,8 @@ def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=Fal
 
 
 
-def findImageRes(img, pxSzMm=1.0, Ng=10, geometricMax=False, plot=True):
+def findImageRes(img, pxSzMm=1.0, Ng=10, geometricMax=False, plot=True,prominence=0.01,width=10, distance=10,
+                 verbose=False):
     # max = np.max(d)
     # OR
     # geoMax = np.max(r*d)
@@ -151,8 +154,9 @@ def findImageRes(img, pxSzMm=1.0, Ng=10, geometricMax=False, plot=True):
 
     #first pass no sharpening
     d0 = getDecorrCurve(img)
-    rPx0,A0 = getDecorrLocalMax(d0)
-    print("r: %3d | A: %10f | Ar: %10f"%(rPx0,A0,A0*rPx0))
+    rPx0,A0 = getDecorrLocalMax(d0, prominence=prominence, width=width, distance=distance)
+    if verbose:
+        print("r: %3d | A: %10f | Ar: %10f"%(rPx0,A0,A0*rPx0))
     maxVal = rPx0
     if geometricMax:
         maxVal *= A0
@@ -172,7 +176,9 @@ def findImageRes(img, pxSzMm=1.0, Ng=10, geometricMax=False, plot=True):
     sMaxPx = 2.*rMaxPx/rPx0
     sMinPx = 1.0/2.355
     sList = getSigmaList(sMinPx,sMaxPx,Ng)
-    maxVal,maxPos,maxSig = performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax,plot=True,title="Coarse Scan")
+    maxVal,maxPos,maxSig = performDecorrScan(img, sList, maxVal, maxPos, maxSig, geometricMax, plot=plot,
+                                             title="Coarse Scan",prominence=prominence,width=width, distance=distance,
+                                             verbose=verbose)
 
     # refine for sigma around maxSig
     if maxSig > 0:
@@ -182,7 +188,9 @@ def findImageRes(img, pxSzMm=1.0, Ng=10, geometricMax=False, plot=True):
         sMinPx = 0.15
         sMaxPx = sList[0]
     sList = getSigmaList(sMinPx,sMaxPx,Ng)
-    maxVal,maxPos,maxSig = performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax,plot=True,title="Refinement Scan")
+    maxVal,maxPos,maxSig = performDecorrScan(img, sList, maxVal, maxPos, maxSig, geometricMax, plot=plot,
+                                             title="Refinement Scan", prominence=prominence,width=width,
+                                             distance=distance, verbose=verbose)
 
     # return image resolution
     resPx = 2.0*rMaxPx/maxPos
@@ -223,33 +231,33 @@ def generateTestImage(N,pxSzMm=1.0,resMm=3.5,numPhotonsPerPx=1000.):
     return img
 
 
-
-import netCDF4 as nc
-
-def tomoSliceRes(nc_file, pxSzMm=1.0, Ng=8, geometricMax=False, plot=True, crop=False):
-    tomoSlice = nc.Dataset(nc_file)
-    tomoData = np.array(tomoSlice.variables['tomo'][:], dtype=np.float32, copy=True)
-
-    # Determine the dimension with length 1
-    data_dim = np.argmin(tomoData.shape)
-
-    # Reshape the data to have the data dimension last
-    tomoData = np.moveaxis(tomoData, data_dim, -1)
-
-    # have problem with space frequency calculation
-    if crop:
-        # Crop the data to the center 0.7*edge length square
-        edge_length = np.min(tomoData.shape[:2])
-        crop_size = int(0.7 * edge_length)
-        start_y = (tomoData.shape[0] - crop_size) // 2
-        start_x = (tomoData.shape[1] - crop_size) // 2
-        tomoDataFiltered = tomoData[start_y:start_y + crop_size, start_x:start_x + crop_size]
-
-        res = findImageRes(np.squeeze(tomoDataFiltered), pxSzMm, Ng, geometricMax, plot)
-    else:
-        res = findImageRes(np.squeeze(tomoData),pxSzMm, Ng, geometricMax, plot)
-
-    return res
+#
+# import netCDF4 as nc
+#
+# def tomoSliceRes(nc_file, pxSzMm=1.0, Ng=8, geometricMax=False, plot=True, crop=False):
+#     tomoSlice = nc.Dataset(nc_file)
+#     tomoData = np.array(tomoSlice.variables['tomo'][:], dtype=np.float32, copy=True)
+#
+#     # Determine the dimension with length 1
+#     data_dim = np.argmin(tomoData.shape)
+#
+#     # Reshape the data to have the data dimension last
+#     tomoData = np.moveaxis(tomoData, data_dim, -1)
+#
+#     # have problem with space frequency calculation
+#     if crop:
+#         # Crop the data to the center 0.7*edge length square
+#         edge_length = np.min(tomoData.shape[:2])
+#         crop_size = int(0.7 * edge_length)
+#         start_y = (tomoData.shape[0] - crop_size) // 2
+#         start_x = (tomoData.shape[1] - crop_size) // 2
+#         tomoDataFiltered = tomoData[start_y:start_y + crop_size, start_x:start_x + crop_size]
+#
+#         res = findImageRes(np.squeeze(tomoDataFiltered), pxSzMm, Ng, geometricMax, plot)
+#     else:
+#         res = findImageRes(np.squeeze(tomoData), pxSzMm, Ng, geometricMax, plot)
+#
+#     return res
 
 
 if __name__ == "__main__":
