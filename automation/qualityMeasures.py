@@ -2,6 +2,10 @@
 
 import numpy as np
 import netCDF4 as nc
+import os
+import json
+import sys
+from contextlib import redirect_stdout
 
 import automation.extractData as extractData
 
@@ -15,6 +19,19 @@ import snrTest
 
 
 
+class Tee:
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+
 class QualityMeasuresAnalyzer:
     """
     A class to analyse the quality measures of a tomographic dataset
@@ -23,26 +40,12 @@ class QualityMeasuresAnalyzer:
         self.directoryPath = directoryPath
         self.sampleMaterial = sampleMaterial
         self.shape = shape
-        self.sampleDiameterMm = None
-        self.filterThicknessMm = None
-        self.vxSizeMm = None
-        self.kvp = None
-        self.dfAverage = None
-        self.cfAverage = None
-        self.kfMiddle = None
-        self.tomoLoRes = None
-        self.tomoSliceZ = None
-        self.tomoSliceX = None
-        self.tomoSliceY = None
-
-    def extractData(self):
-        """extract all data required including metadata, projections and tomographic data"""
-        self.sampleDiameterMm, self.filterThicknessMm, self.vxSizeMm, self.kvp, self.dfAverage, self.cfAverage, self.kfMiddle, self.tomoLoRes = \
+        (self.sampleDiameterMm, self.filterThicknessMm, self.vxSizeMm, self.kvp, self.dfAverage,
+         self.cfAverage, self.kfMiddle, self.tomoLoRes) = \
             extractData.extractAllData(self.directoryPath, shape=self.shape, offset=10000)
         self.tomoSliceZ = self.tomoLoRes[self.tomoLoRes.shape[1] // 2]
         self.tomoSliceX = self.tomoLoRes[:, self.tomoLoRes.shape[0] // 2]
         self.tomoSliceY = self.tomoLoRes[:, :, self.tomoLoRes.shape[0] // 2]
-
 
     def computeBhc(self):
         """compute beam hardening correction coefficient"""
@@ -58,6 +61,8 @@ class QualityMeasuresAnalyzer:
         print("Simulated BHC = %.4f" % bhcSimu)
         print("Theoretical BHC = %.4f" % bhcTheo)
 
+        return bhc
+
     def computeScattering(self):
         """compute the scattering contribution"""
         transExpe, transTheo, estimatedSampleDiameterMm, result = \
@@ -72,6 +77,8 @@ class QualityMeasuresAnalyzer:
         print("Theoretical transmission = %.4f" % transTheo)
         print("Scattering contribution = %.4f" % result)
         print("Estimated scattering = %.4f" % (scatEsti / 100))
+
+        return result
 
     def computeSnr(self,radiusFraction=1):
         """
@@ -89,6 +96,8 @@ class QualityMeasuresAnalyzer:
         print("SNR Y = %.4f" % snrY)
         print("SNR Z = %.4f" % snrZ)
 
+        return [snrX, snrY, snrZ]
+
     def computeResolution(self):
         """compute the resolution of the tomographic dataset"""
         resX = re.findImageRes(self.tomoSliceX, pxSzMm=2 * self.vxSizeMm, Ng=8, plot=False)
@@ -101,20 +110,50 @@ class QualityMeasuresAnalyzer:
         print("Resolution Y = %.4f mm" % resY)
         print("Resolution Z = %.4f mm" % resZ)
 
+        return [resX, resY, resZ]
+
     def analyseAll(self):
-        self.extractData()
-        self.computeBhc()
-        self.computeScattering()
-        self.computeSnr()
-        self.computeResolution()
+        # Generate the log file name
+        logFileName = f"{self.sampleMaterial}_{self.sampleDiameterMm}mm_{self.kvp}kv_log.txt"
+        logFilePath = os.path.join(self.directoryPath, logFileName)
+
+        # Open the log file
+        with open(logFilePath, "w") as logFile:
+            # Redirect standard output to both the log file and the console
+            with redirect_stdout(Tee(sys.stdout, logFile)):
+                # Perform the analysis
+                bhc = self.computeBhc()
+                scattering = self.computeScattering()
+                snr = self.computeSnr()
+                resolution = self.computeResolution()
+
+                results = {
+                    "BHC": bhc,
+                    "Scattering": scattering,
+                    "SNR": snr,
+                    "Resolution": resolution
+                }
+
+
+                # Generate the output file name
+                resultFileName = f"{self.sampleMaterial}_{self.sampleDiameterMm}mm_{self.kvp}kv_result.json"
+                resultFilePath = os.path.join(self.directoryPath, resultFileName)
+
+                # Save results to a file in the input directory
+                with open(resultFilePath, "w") as resultFile:
+                    json.dump(results, resultFile, indent=4)
+
+        return bhc, scattering, snr, resolution
 
 
 
 # if __name__ == '__main__':
-#     analyseQualityMeasures('/home/xilin/projects/recon_ws/'
-#                            'EfficientScans/AL_33mm__180kV-80uA_bin2_450_CD1150mm', "Al",shape=(938, 938))
+#     al33mm180kv = QualityMeasuresAnalyzer('/home/xilin/projects/recon_ws/EfficientScans/'
+#                                        'AL_33mm__180kV-80uA_bin2_450_CD1150mm', "Al", shape=(938, 938))
+#     al33mm180kv.analyseAll()
+#
 
 if __name__ == '__main__':
-    al33mm180kv = QualityMeasuresAnalyzer('/home/xilin/projects/recon_ws/EfficientScans/'
-                                       'AL_33mm__180kV-80uA_bin2_450_CD1150mm', "Al", shape=(938, 938))
-    al33mm180kv.analyseAll()
+    pmma38mm60kv = QualityMeasuresAnalyzer('/home/xilin/projects/recon_ws/EfficientScans/'
+                                          'PMMA_38mm__60kV-150uA_bin2_450_CD1150mm', "pmma", shape=(938, 938))
+    pmma38mm60kv.analyseAll()
