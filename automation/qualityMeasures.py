@@ -20,6 +20,7 @@ import snrTest
 
 
 class Tee:
+    """ Class to redirect standard output to multiple files """
     def __init__(self, *files):
         self.files = files
 
@@ -35,6 +36,17 @@ class Tee:
 class QualityMeasuresAnalyzer:
     """
     A class to analyse the quality measures of a tomographic dataset
+    Input:
+    - directoryPath: the path to the directory containing the tomographic dataset
+    - sampleMaterial: the material of the sample
+    - shape: the shape of the projections, the dtype should be np.uint16
+
+    Available methods and corresponding quality measures:
+    - computeBhc: Beam Hardening Correction (BHC)
+    - computeScattering: Scattering Contribution
+    - computeSnr: Signal-to-Noise Ratio (SNR)
+    - computeResolution: Resolution based on decorrelation analysis
+    - analyseAll: Perform all analyses and save results to a file
     """
     def __init__(self, directoryPath, sampleMaterial, shape):
         self.directoryPath = directoryPath
@@ -83,8 +95,8 @@ class QualityMeasuresAnalyzer:
     def computeSnr(self,radiusFraction=1):
         """
         compute the signal-to-noise ratio
-        need to mask the snrZ otherwise it will be too high
-        the radiusFraction is set to 0.9 to let the first stdv peak greater than the left end
+        can mask the snrZ if it is too high, the radiusFraction can be 0.9 to let the first stdv peak
+        greater than the left end
         """
         snrX = snrTest.estimateSNR(self.tomoSliceX, kernelRangePx=3, verbose=False)
         snrY = snrTest.estimateSNR(self.tomoSliceY, kernelRangePx=3, verbose=False)
@@ -113,9 +125,17 @@ class QualityMeasuresAnalyzer:
         return [resX, resY, resZ]
 
     def analyseAll(self):
+        """
+        Perform the analysis of the quality measures and save both the results and the log to the parent directory
+        :return: bhc, scattering, snr, resolution
+        """
+
+        # Get the parent directory of the input directory
+        parentDirectory = os.path.dirname(self.directoryPath)
+
         # Generate the log file name
-        logFileName = f"{self.sampleMaterial}_{self.sampleDiameterMm}mm_{self.kvp}kv_log.txt"
-        logFilePath = os.path.join(self.directoryPath, logFileName)
+        logFileName = f"{self.sampleMaterial}_{int(self.sampleDiameterMm)}mm_{int(self.kvp)}kv_log.txt"
+        logFilePath = os.path.join(parentDirectory, logFileName)
 
         # Open the log file
         with open(logFilePath, "w") as logFile:
@@ -134,12 +154,11 @@ class QualityMeasuresAnalyzer:
                     "Resolution": resolution
                 }
 
-
                 # Generate the output file name
-                resultFileName = f"{self.sampleMaterial}_{self.sampleDiameterMm}mm_{self.kvp}kv_result.json"
-                resultFilePath = os.path.join(self.directoryPath, resultFileName)
+                resultFileName = f"{self.sampleMaterial}_{int(self.sampleDiameterMm)}mm_{int(self.kvp)}kv_result.json"
+                resultFilePath = os.path.join(parentDirectory, resultFileName)
 
-                # Save results to a file in the input directory
+                # Save results to a file in the parent directory
                 with open(resultFilePath, "w") as resultFile:
                     json.dump(results, resultFile, indent=4)
 
@@ -151,7 +170,7 @@ class QualityMeasuresAnalyzer:
 #     al33mm180kv = QualityMeasuresAnalyzer('/home/xilin/projects/recon_ws/EfficientScans/'
 #                                        'AL_33mm__180kV-80uA_bin2_450_CD1150mm', "Al", shape=(938, 938))
 #     al33mm180kv.analyseAll()
-#
+
 
 if __name__ == '__main__':
     pmma38mm60kv = QualityMeasuresAnalyzer('/home/xilin/projects/recon_ws/EfficientScans/'
