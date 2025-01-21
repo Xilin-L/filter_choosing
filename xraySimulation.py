@@ -85,7 +85,7 @@ def generateEmittedSpectrum(kvp=100,filterMaterial='Al',filterThicknessMm=0.5,en
     # Filter the spectrum (unit is 'mm')
     s.filter('W',0.002) # self absorption by target
     s.filter('C',0.3) # diamond window
-    if isinstance(filterMaterial,list): # for multiple filters
+    if isinstance(filterMaterial,list) and isinstance(filterThicknessMm, list): # for multiple filters
         if len(filterMaterial) != len(filterThicknessMm):
             raise Exception("provided a list of filter materials: %s\n but list of material thicknesses does not correspond: %s"%(filterMaterial,filterThicknessMm))
         for mc in range(len(filterMaterial)):
@@ -237,7 +237,7 @@ def estimateMeanEnergy(energyKeV,spectrum):
 
 if __name__ == "__main__":
 
-    energyKeV,spectrumIn = generateEmittedSpectrum(kvp=125.,filterThicknessMm=2.5)
+    energyKeV,spectrumIn = generateEmittedSpectrum(kvp=125,filterThicknessMm=2.5)
     print("Mean energy of the emitted spectrum (keV): %s"%estimateMeanEnergy(energyKeV,spectrumIn))
     spectrumOut = detectedSpectrum(energyKeV,spectrumIn)
     plotSpectra(energyKeV,spectrumIn,spectrumOut)
