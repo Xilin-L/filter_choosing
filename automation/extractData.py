@@ -7,7 +7,7 @@ import netCDF4 as nc
 
 def extractMetadata(directoryPath):
     """Extract metadata from the specified file in the directory and its subdirectories."""
-    keywords = ["diameter", "source_filter_thickness_mm", "voxel_size", "x_ray_energy"]
+    keywords = ["diameter", "source_filter_thickness_mm", "voxel_size", "x_ray_energy", "subsample_factor"]
     results = {keyword: None for keyword in keywords}
 
     # Search for the file 'expt.in' in the directory and subdirectories
@@ -29,8 +29,9 @@ def extractMetadata(directoryPath):
     filterThicknessMm = results.get("source_filter_thickness_mm")
     vxSizeMm = results.get("voxel_size") / 1000
     kvp = results.get("x_ray_energy")
+    binning = results.get("subsample_factor")
 
-    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp
+    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, binning
 
 def processFiles(directoryPath, pattern, shape, dtype=np.uint16):
     """Process files matching the pattern and return their average as a NumPy array."""
@@ -68,7 +69,7 @@ def extractAllData(directoryPath,shape, offset=10000):
     :return: sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage,kfMiddle
     """
 
-    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp = extractMetadata(directoryPath)
+    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp ,binning= extractMetadata(directoryPath)
 
 
     dfAverage = processFiles(directoryPath, '*DF*.raw', shape=shape)
@@ -87,7 +88,7 @@ def extractAllData(directoryPath,shape, offset=10000):
         tomoLoRes[tomoLoRes < 0] = 0  # Set negative values to 0
 
 
-    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage,kfMiddle, tomoLoRes
+    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, binning, dfAverage, cfAverage,kfMiddle, tomoLoRes
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Extract metadata from a file and process DF and CF files.')
@@ -95,7 +96,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     results = extractAllData(args.directoryPath)
-    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, dfAverage, cfAverage, kfMiddle, tomoLoRes = results
+    sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, binning, dfAverage, cfAverage, kfMiddle, tomoLoRes = results
 
     print(f"sampleDiameterMm: {sampleDiameterMm}")
     print(f"filterThicknessMm: {filterThicknessMm}")
