@@ -79,7 +79,7 @@ def calcScatteringFromData(kf, cf, df, tomoSlice, kvp, filterMaterial, filterThi
     midIdx = projSmooth.shape[0] // 2
     choppedProj = projSmooth[midIdx - 100:midIdx + 100, :]
     # assume the projection at the center is the smallest value in the image
-    transExpe = np.min(choppedProj)
+    transExpe = np.nanmin(choppedProj)
 
     transTheo, EstimatedSampleDiameterMm = transmissionTheoretical(tomoSlice, kvp=kvp,
                                                                       filterMaterial=filterMaterial,
