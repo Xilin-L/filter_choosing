@@ -20,7 +20,7 @@ def extractMetadata(directoryPath):
         for line in file:
             for keyword in keywords:
                 if keyword in line:
-                    match = re.search(rf"{keyword}\s*[:=]?\s*(\d+\.?\d*)", line)
+                    match = re.search(rf"^\s*{keyword}\s*[:=]?\s*(\d+\.?\d*)", line)
                     if match:
                         results[keyword] = float(match.group(1))
                         break
