@@ -53,13 +53,13 @@ class QualityMeasuresAnalyzer:
         self.sampleMaterial = sampleMaterial
         self.shape = shape
         (self.sampleDiameterMm, self.filterThicknessMm, self.vxSizeMm, self.kvp, self.binning, self.dfAverage,
-         self.cfAverage, self.kfMiddle, self.tomoLoRes) = \
+         self.cfAverage, self.kfMiddle, self.tomoSliceX, self.tomoSliceY, self.tomoSliceZ) = \
             extractData.extractAllData(self.directoryPath, shape=self.shape, offset=10000)
-        self.tomoSliceZ = self.tomoLoRes[self.tomoLoRes.shape[1] // 2]
-        self.tomoSliceX = self.tomoLoRes[:, self.tomoLoRes.shape[0] // 2]
-        self.tomoSliceY = self.tomoLoRes[:, :, self.tomoLoRes.shape[0] // 2]
+        # self.tomoSliceZ = self.tomoLoRes[self.tomoLoRes.shape[1] // 2]
+        # self.tomoSliceX = self.tomoLoRes[:, self.tomoLoRes.shape[0] // 2]
+        # self.tomoSliceY = self.tomoLoRes[:, :, self.tomoLoRes.shape[0] // 2]
 
-        self.tomoLoResFactor = np.floor(self.kfMiddle.shape[0] / self.tomoSliceZ.shape[0])
+        # self.tomoLoResFactor = np.floor(self.kfMiddle.shape[0] / self.tomoSliceZ.shape[0])
 
     def computeBhc(self):
         """compute beam hardening correction coefficient"""
@@ -69,31 +69,32 @@ class QualityMeasuresAnalyzer:
                                                  filterMaterial='Fe', filterThicknessMm=self.filterThicknessMm,
                                                  materialName=self.sampleMaterial, plotCurve=False, verbose=False)
         bhcSimu = bhs.estimateBhcFromTomo(tomoSimu, vxSzMm=self.vxSizeMm, plot=False, verbose=False)
-        bhc = bhs.estimateBhcFromTomo(self.tomoSliceZ, vxSzMm=self.tomoLoResFactor * self.vxSizeMm, plot=False, verbose=False)
+        bhc = bhs.estimateBhcFromTomo(self.tomoSliceZ, vxSzMm=self.vxSizeMm, plot=False, verbose=False)
 
         print("\n#### BHC Result ####")
         print("Experimental BHC = %.4f" % bhc)
         print("Simulated BHC = %.4f" % bhcSimu)
         print("Theoretical BHC = %.4f" % bhcTheo)
 
-        return bhc
+        return bhc, bhcSimu, bhcTheo
 
     def computeScattering(self):
         """compute the scattering contribution"""
         transExpe, transTheo, estimatedSampleDiameterMm, result = \
             ss.calcScatteringFromData(self.kfMiddle, self.cfAverage, self.dfAverage, self.tomoSliceZ, self.kvp, 'Fe',
-                                      self.filterThicknessMm, self.sampleMaterial, self.tomoLoResFactor * self.vxSizeMm, offset=0)
+                                      self.filterThicknessMm, self.sampleMaterial, self.vxSizeMm, offset=0)
 
         energyKeV, spectrum = filterPerformance.setSpectrum(self.kvp, 'Fe', self.filterThicknessMm)
         scatEsti = ss.estimateMeasuredScatterAsPercentOfFlux(energyKeV, spectrum, self.sampleMaterial, self.sampleDiameterMm)
+        scatEsti /= 100
         print("\n#### Scattering Result ####")
         print("Diameter of the sample is %.4f mm" % estimatedSampleDiameterMm)
         print("Experimental transmission = %.4f" % transExpe)
         print("Theoretical transmission = %.4f" % transTheo)
         print("Scattering contribution = %.4f" % result)
-        print("Estimated scattering = %.4f" % (scatEsti / 100))
+        print("Estimated scattering = %.4f" % scatEsti)
 
-        return result
+        return result, scatEsti
 
     def computeSnr(self,radiusFraction=1):
         """
@@ -115,9 +116,9 @@ class QualityMeasuresAnalyzer:
 
     def computeResolution(self):
         """compute the resolution of the tomographic dataset"""
-        resX = resEst.findImageRes(self.tomoSliceX, pxSzMm=self.tomoLoResFactor * self.vxSizeMm, Ng=10, plot=False)
-        resY = resEst.findImageRes(self.tomoSliceY, pxSzMm=self.tomoLoResFactor * self.vxSizeMm, Ng=10, plot=False)
-        resZ = resEst.findImageRes(self.tomoSliceZ, pxSzMm=self.tomoLoResFactor * self.vxSizeMm, Ng=10, plot=False)
+        resX = resEst.findImageRes(self.tomoSliceX, pxSzMm=self.vxSizeMm, Ng=10, plot=False)
+        resY = resEst.findImageRes(self.tomoSliceY, pxSzMm=self.vxSizeMm, Ng=10, plot=False)
+        resZ = resEst.findImageRes(self.tomoSliceZ, pxSzMm=self.vxSizeMm, Ng=10, plot=False)
         # resZ is much lower than the other two, similar to the SNR result without masking
 
         print("\n#### Resolution Result ####")
@@ -159,14 +160,14 @@ class QualityMeasuresAnalyzer:
             # Redirect standard output to both the log file and the console
             with redirect_stdout(Tee(sys.stdout, logFile)):
                 # Perform the analysis
-                bhc = self.computeBhc()
-                scattering = self.computeScattering()
+                bhc, bhcSimu, bhcTheo = self.computeBhc()
+                scattering, scatEsti = self.computeScattering()
                 snr = self.computeSnr()
                 resolution = self.computeResolution()
 
                 results = {
-                    "BHC": bhc,
-                    "Scattering": scattering,
+                    "BHC": [bhc, bhcSimu, bhcTheo],
+                    "Scattering": [scattering, scatEsti],
                     "SNR": snr,
                     "Resolution": resolution
                 }

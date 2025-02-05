@@ -77,18 +77,47 @@ def extractAllData(directoryPath,shape, offset=10000):
 
     kfMiddle = findMiddleKFFile(directoryPath,shape=shape)
 
-    tomoFilePath = glob.glob(os.path.join(directoryPath, '**', 'tomoLoRes.nc'), recursive=True)
-    if not tomoFilePath:
-        print("No 'tomoLoRes.nc' file found.")
-        tomoLoRes = None
+    # tomoFilePath = glob.glob(os.path.join(directoryPath, '**', 'tomoLoRes.nc'), recursive=True)
+    # if not tomoFilePath:
+    #     print("No 'tomoLoRes.nc' file found.")
+    #     tomoLoRes = None
+    # else:
+    #     tomoData = np.nan_to_num(
+    #         np.array(nc.Dataset(tomoFilePath[0]).variables['tomo'][:], dtype=np.float32, copy=True), nan=0.0)
+    #     tomoLoRes = np.copy(tomoData) - offset  # shift back the values
+    #     tomoLoRes[tomoLoRes < 0] = 0  # Set negative values to 0
+
+    tomoSliceXPath = glob.glob(os.path.join(directoryPath, '**', 'tomoSliceX*.nc'), recursive=True)
+    tomoSliceYPath = glob.glob(os.path.join(directoryPath, '**', 'tomoSliceY*.nc'), recursive=True)
+    tomoSliceZPath = glob.glob(os.path.join(directoryPath, '**', 'tomoSliceZ*.nc'), recursive=True)
+
+    if not tomoSliceXPath or not tomoSliceYPath or not tomoSliceZPath:
+        print("One or more tomoSlice files not found.")
+        tomoSliceX, tomoSliceY, tomoSliceZ = None, None, None
     else:
-        tomoData = np.nan_to_num(
-            np.array(nc.Dataset(tomoFilePath[0]).variables['tomo'][:], dtype=np.float32, copy=True), nan=0.0)
-        tomoLoRes = np.copy(tomoData) - offset  # shift back the values
-        tomoLoRes[tomoLoRes < 0] = 0  # Set negative values to 0
+        tomoSliceX = np.nan_to_num(
+            np.array(nc.Dataset(tomoSliceXPath[0]).variables['tomo'][:], dtype=np.float32, copy=True), nan=0.0)
+        tomoSliceY = np.nan_to_num(
+            np.array(nc.Dataset(tomoSliceYPath[0]).variables['tomo'][:], dtype=np.float32, copy=True), nan=0.0)
+        tomoSliceZ = np.nan_to_num(
+            np.array(nc.Dataset(tomoSliceZPath[0]).variables['tomo'][:], dtype=np.float32, copy=True), nan=0.0)
+
+        # Remove the extra dimension
+        tomoSliceX = np.squeeze(tomoSliceX)
+        tomoSliceY = np.squeeze(tomoSliceY)
+        tomoSliceZ = np.squeeze(tomoSliceZ)
+
+        tomoSliceX = np.copy(tomoSliceX) - offset  # shift back the values
+        tomoSliceY = np.copy(tomoSliceY) - offset
+        tomoSliceZ = np.copy(tomoSliceZ) - offset
+
+        tomoSliceX[tomoSliceX < 0] = 0  # Set negative values to 0
+        tomoSliceY[tomoSliceY < 0] = 0  # Set negative values to 0
+        tomoSliceZ[tomoSliceZ < 0] = 0  # Set negative values to 0
 
 
-    return sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, binning, dfAverage, cfAverage,kfMiddle, tomoLoRes
+    return (sampleDiameterMm, filterThicknessMm, vxSizeMm, kvp, binning, dfAverage, cfAverage, kfMiddle,
+            tomoSliceX, tomoSliceY, tomoSliceZ)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Extract metadata from a file and process DF and CF files.')
