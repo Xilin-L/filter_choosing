@@ -171,7 +171,7 @@ def projectWithBeamHardeningModel(imgIn, A, n, angles=None, vxSzMm=1.0):
 def simulateBH(sampleDiameterMm=4., sampleDiameterVx=100, kvp=60, filterMaterial='Al',
                   filterThicknessMm=0.5, materialName='marble', plotIdeal=False,plotBH=False, plotCurve=True,verbose=True):
     '''
-    similate the beam hardening effect for a disk.
+    simulate the beam hardening effect for a disk.
     sampleDiameterVx: diameter of the sample in voxels
     use the ratio of sampleDiameterMm/sampleDiameterVx to determine the resolution of the image
     '''
