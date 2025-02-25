@@ -145,10 +145,21 @@ def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=Fal
 
 
 def findImageRes(img, pxSzMm=1.0, Ng=10, geometricMax=False, plot=True,prominence=0.01,width=10, distance=10,
-                 verbose=False):
+                 verbose=False, cropFactor=0):
+    # cropFactor: fraction of the smallest dimension of the image size to crop off the edges.
+    # a non-square image will be cropped to a non-square image
+
     # max = np.max(d)
     # OR
     # geoMax = np.max(r*d)
+    if 0.5 > cropFactor > 0:
+        crop_size = int(cropFactor * np.min(img.shape))
+        img = img[crop_size:-crop_size, crop_size:-crop_size]
+    elif cropFactor == 0:
+        img = img
+    else:
+        raise Exception("cropFactor should between 0 and 0.5")
+
     Ny,Nx = img.shape
     rMaxPx = getMaxRadius(Ny,Nx)
 
@@ -194,7 +205,7 @@ def findImageRes(img, pxSzMm=1.0, Ng=10, geometricMax=False, plot=True,prominenc
 
     # return image resolution
     resPx = 2.0*rMaxPx/maxPos
-    return pxSzMm*resPx
+    return pxSzMm*resPx, resPx
 
 def generateTestImage(N,pxSzMm=1.0,resMm=3.5,numPhotonsPerPx=1000.):
     img = np.ones((N,N),dtype=np.float32)
@@ -267,7 +278,7 @@ if __name__ == "__main__":
     plt.imshow(img,"gray")
     plt.colorbar()
     plt.show()
-    res = findImageRes(img)
+    res, resPx = findImageRes(img)
     print(res)
 
     exit()

@@ -280,15 +280,23 @@ def calcNoiseStdv(img,stdFiltRangePx=1,plotData=False):
 
 
 
-def estimateSNR(img, kernelRangePx=1, plotData=False, verbose=False, mask=False, radiusFraction=1.0):
-    if mask:
-        # only contains the sample and a small ring around it
-        imgFiltered = np.copy(img)
-        center = np.array(imgFiltered.shape) // 2
-        distance_from_center = np.sqrt(
-            ((np.indices(imgFiltered.shape) - center[:, None, None]) ** 2).sum(axis=0))
-        imgFiltered[(imgFiltered < 0) | (distance_from_center > center[0] * radiusFraction)] = np.nan  # Set negative values and values away from center to NaN
-        img = imgFiltered
+def estimateSNR(img, kernelRangePx=1, plotData=False, verbose=False, cropFactor=0):
+    # if mask:
+    #     # only contains the sample and a small ring around it
+    #     imgFiltered = np.copy(img)
+    #     center = np.array(imgFiltered.shape) // 2
+    #     distance_from_center = np.sqrt(
+    #         ((np.indices(imgFiltered.shape) - center[:, None, None]) ** 2).sum(axis=0))
+    #     imgFiltered[(imgFiltered < 0) | (distance_from_center > center[0] * radiusFraction)] = np.nan  # Set negative values and values away from center to NaN
+    #     img = imgFiltered
+    #
+    if 0.5 > cropFactor > 0:
+        crop_size = int(cropFactor * np.min(img.shape))
+        img = img[crop_size:-crop_size, crop_size:-crop_size]
+    elif cropFactor == 0:
+        img = img
+    else:
+        raise Exception("cropFactor should between 0 and 0.5")
 
     dataRange = calcDataRange(img, kernelRangePx, plotData)
     noiseStdv = calcNoiseStdv(img, kernelRangePx, plotData)
