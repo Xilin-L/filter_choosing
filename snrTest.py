@@ -176,6 +176,16 @@ def calcDataRange(img,medFiltRangePx=1,plotHistChange=False):
 
             dataRange = 5.0*dataRangeSigma
 
+    elif peaks[0] > 0 and histMedSmth[0] > histMedSmth[peaks[0]]:
+
+        # if the left end is a peak
+
+        dmin = valsMed[0]
+
+        dmax = valsMed[peaks[-1]]
+
+        dataRange = dmax - dmin
+
     else:
 
         dmin = valsMed[peaks[0]]
@@ -280,17 +290,27 @@ def calcNoiseStdv(img,stdFiltRangePx=1,plotData=False):
 
 
 
-def estimateSNR(img, kernelRangePx=1, plotData=False, verbose=False, cropFactor=0):
-    # if mask:
-    #     # only contains the sample and a small ring around it
-    #     imgFiltered = np.copy(img)
-    #     center = np.array(imgFiltered.shape) // 2
-    #     distance_from_center = np.sqrt(
-    #         ((np.indices(imgFiltered.shape) - center[:, None, None]) ** 2).sum(axis=0))
-    #     imgFiltered[(imgFiltered < 0) | (distance_from_center > center[0] * radiusFraction)] = np.nan  # Set negative values and values away from center to NaN
-    #     img = imgFiltered
-    #
-    if 0.5 > cropFactor > 0:
+def estimateSNR(img, kernelRangePx=1, plotData=False, verbose=False, circularMask=False, radiusFraction=1, cropFactor=0):
+    """
+    Estimate the signal-to-noise ratio (SNR) of an image.
+    :param img: image as a 2D numpy array
+    :param kernelRangePx: the range of the median/std filter kernel in pixels
+    :param plotData: if True, plot the data
+    :param verbose: if True, print the SNR information
+    :param circularMask: if True, only contains the image within a circle of radiusFraction
+    :param radiusFraction: radius of the circular mask as a fraction of the image size, default is 1
+    :param cropFactor:  if 0, no cropping, if between 0 and 0.5, crop the image by that fraction, default is 0
+    :return: snr, dataRange
+    """
+    if circularMask:
+        # only contains the sample and a small ring around it
+        imgFiltered = np.copy(img)
+        center = np.array(imgFiltered.shape) // 2
+        distance_from_center = np.sqrt(
+            ((np.indices(imgFiltered.shape) - center[:, None, None]) ** 2).sum(axis=0))
+        imgFiltered[(imgFiltered < 0) | (distance_from_center > center[0] * radiusFraction)] = np.nan  # Set negative values and values away from center to NaN
+        img = imgFiltered
+    elif 0.5 > cropFactor > 0:
         crop_size = int(cropFactor * np.min(img.shape))
         img = img[crop_size:-crop_size, crop_size:-crop_size]
     elif cropFactor == 0:
@@ -308,7 +328,7 @@ def estimateSNR(img, kernelRangePx=1, plotData=False, verbose=False, cropFactor=
         print("noise stdv = %s" % (noiseStdv))
         print("SNR = %s" % (snr))
 
-    return snr
+    return snr, dataRange
 
 
 
