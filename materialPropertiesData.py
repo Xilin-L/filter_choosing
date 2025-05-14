@@ -219,5 +219,25 @@ materialProperties = {
         "weights": [0.7236, 0.2764],
         "symbols": ["Fe", "O"],
         "density": 5.15
+    },
+    "xe500psi": {
+        "weights": [1.0],
+        "symbols": ["Xe"],
+        "density": 0.24
+    },
+    "air": {
+        "weights": [0.755, 0.232, 0.013],
+        "symbols": ["N", "O", "Ar"],
+        "density": 0.0012
+    },
+    "nai1.5mol": {
+        "weights": [0.153, 0.847],
+        "symbols": ["Na", "I"],
+        "density": 1.16
+    },
+    "spt": {
+        "weights": [0.046, 0.214, 0.740],
+        "symbols": ["Na", "O", "W"],
+        "density": 3.1
     }
 }
