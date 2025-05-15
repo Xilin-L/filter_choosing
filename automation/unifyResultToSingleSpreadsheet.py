@@ -37,12 +37,17 @@ for json_file in os.listdir(results_dir):
             # Separate SNR and resolution results
             snr = data.pop('SNR', [None, None, None])
             reso = data.pop('Resolution', [None, None, None])
+            reso_px = data.pop('ResolutionPx', [None, None, None])
+
             data['SNR_X'] = snr[0]
             data['SNR_Y'] = snr[1]
             data['SNR_Z'] = snr[2]
             data['Resolution_X'] = reso[0]
             data['Resolution_Y'] = reso[1]
             data['Resolution_Z'] = reso[2]
+            data['ResolutionPx_X'] = reso_px[0]
+            data['ResolutionPx_Y'] = reso_px[1]
+            data['ResolutionPx_Z'] = reso_px[2]
             data_list.append(data)
 
 # Create a DataFrame from the list of data
@@ -53,7 +58,8 @@ df = df.round(4)
 
 # Reorder the columns
 df = df[['sampleMaterial', 'sampleDiameterMm', 'kvp', 'BHC', 'BHC_Simu', 'BHC_Theo', 'Scattering', 'Scattering_Esti',
-         'SNR_X', 'SNR_Y', 'SNR_Z', 'Resolution_X', 'Resolution_Y', 'Resolution_Z', 'binning']]
+         'SNR_X', 'SNR_Y', 'SNR_Z', 'Resolution_X', 'Resolution_Y', 'Resolution_Z', 'ResolutionPx_X', 'ResolutionPx_Y',
+            'ResolutionPx_Z', 'binning']]
 # Write the DataFrame to an Excel file, classifying by sampleMaterial and binning
 with pd.ExcelWriter(output_excel) as writer:
     for (sampleMaterial, binning), group in df.groupby(['sampleMaterial', 'binning']):
