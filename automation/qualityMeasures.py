@@ -55,6 +55,8 @@ class QualityMeasuresAnalyzer:
         (self.sampleDiameterMm, self.filterThicknessMm, self.vxSizeMm, self.kvp, self.binning, self.dfAverage,
          self.cfAverage, self.kfMiddle, self.tomoSliceX, self.tomoSliceY, self.tomoSliceZ) = \
             extractData.extractAllData(self.directoryPath, shape=self.shape, offset=10000)
+        (_,_,_,_,_,_,_,_, self.tomoSliceXraw, self.tomoSliceYraw, self.tomoSliceZraw) = \
+            extractData.extractAllData(self.directoryPath, shape=self.shape, offset=0)
         # self.tomoSliceZ = self.tomoLoRes[self.tomoLoRes.shape[1] // 2]
         # self.tomoSliceX = self.tomoLoRes[:, self.tomoLoRes.shape[0] // 2]
         # self.tomoSliceY = self.tomoLoRes[:, :, self.tomoLoRes.shape[0] // 2]
@@ -102,31 +104,34 @@ class QualityMeasuresAnalyzer:
         can mask the snrZ if it is too high, the radiusFraction can be 0.9 to let the first stdv peak
         greater than the left end
         """
-        snrX = snrTest.estimateSNR(self.tomoSliceX, kernelRangePx=3, verbose=False)
-        snrY = snrTest.estimateSNR(self.tomoSliceY, kernelRangePx=3, verbose=False)
-        snrZ = snrTest.estimateSNR(self.tomoSliceZ, kernelRangePx=3, verbose=False,
-                                   mask=True, radiusFraction=radiusFraction)
+        # snrX, rangeX = snrTest.estimateSNR(self.tomoSliceX, kernelRangePx=9, verbose=False, cropFactor=0.32)
+        # snrY, rangeY = snrTest.estimateSNR(self.tomoSliceY, kernelRangePx=9, verbose=False, cropFactor=0.32)
+        # snrZ, rangeZ = snrTest.estimateSNR(self.tomoSliceZ, kernelRangePx=9, verbose=False, cropFactor=0.32)
+
+        snrX, rangeX = snrTest.estimateSNR(self.tomoSliceXraw, kernelRangePx=9, verbose=False)
+        snrY, rangeY = snrTest.estimateSNR(self.tomoSliceYraw, kernelRangePx=9, verbose=False)
+        snrZ, rangeZ = snrTest.estimateSNR(self.tomoSliceZraw, kernelRangePx=9, verbose=False, circularMask=True)
 
         print("\n#### SNR Result ####")
         print("SNR X = %.4f" % snrX)
         print("SNR Y = %.4f" % snrY)
         print("SNR Z = %.4f" % snrZ)
 
-        return [snrX, snrY, snrZ]
+        return [snrX, snrY, snrZ] , [rangeX, rangeY, rangeZ]
 
     def computeResolution(self):
         """compute the resolution of the tomographic dataset"""
-        resX = resEst.findImageRes(self.tomoSliceX, pxSzMm=self.vxSizeMm, Ng=10, plot=False)
-        resY = resEst.findImageRes(self.tomoSliceY, pxSzMm=self.vxSizeMm, Ng=10, plot=False)
-        resZ = resEst.findImageRes(self.tomoSliceZ, pxSzMm=self.vxSizeMm, Ng=10, plot=False)
+        resX, resPxX = resEst.findImageRes(self.tomoSliceX, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0.3)
+        resY, resPxY = resEst.findImageRes(self.tomoSliceY, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0.3)
+        resZ, resPxZ = resEst.findImageRes(self.tomoSliceZ, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0.3)
         # resZ is much lower than the other two, similar to the SNR result without masking
 
         print("\n#### Resolution Result ####")
-        print("Resolution X = %.4f mm" % resX)
-        print("Resolution Y = %.4f mm" % resY)
-        print("Resolution Z = %.4f mm" % resZ)
+        print("Resolution X = %.4f mm (%.2f pixels)" % (resX, resPxX))
+        print("Resolution Y = %.4f mm (%.2f pixels)" % (resY, resPxY))
+        print("Resolution Z = %.4f mm (%.2f pixels)" % (resZ, resPxZ))
 
-        return [resX, resY, resZ]
+        return [resX, resY, resZ], [resPxX, resPxY, resPxZ]
 
 
     def analyseAll(self):
@@ -160,23 +165,25 @@ class QualityMeasuresAnalyzer:
             # Redirect standard output to both the log file and the console
             with redirect_stdout(Tee(sys.stdout, logFile)):
                 # Perform the analysis
-                bhc, bhcSimu, bhcTheo = self.computeBhc()
-                scattering, scatEsti = self.computeScattering()
-                snr = self.computeSnr()
-                resolution = self.computeResolution()
+                # bhc, bhcSimu, bhcTheo = self.computeBhc()
+                # scattering, scatEsti = self.computeScattering()
+                snr, snrRange = self.computeSnr()
+                # resolution, resolutionPx = self.computeResolution()
 
                 results = {
-                    "BHC": [bhc, bhcSimu, bhcTheo],
-                    "Scattering": [scattering, scatEsti],
+                    # "BHC": [bhc, bhcSimu, bhcTheo],
+                    # "Scattering": [scattering, scatEsti],
                     "SNR": snr,
-                    "Resolution": resolution
+                    "SNRRange": snrRange
+                    # "Resolution": resolution,
+                    # "ResolutionPx": resolutionPx
                 }
 
                 # Save results to a file in the results directory
                 with open(resultFilePath, "w") as resultFile:
                     json.dump(results, resultFile, indent=4)
 
-        return bhc, scattering, snr, resolution
+        # return bhc, scattering, snr, resolution, resolutionPx
 
 
 
