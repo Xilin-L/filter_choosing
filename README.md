@@ -7,7 +7,7 @@ from filterPerformance import *
 
 # Replace with your values:
 kvp = 120  # kVp
-filterMaterial = "Al"
+filterMaterial = "Al"  # can be "Fe" as well
 sampleMaterial = "sandstone"
 sampleDiameterMm = 25  # mm
 
