@@ -118,7 +118,7 @@ def calcMassAttenuation(energyKeV, materialWeights, materialSymbols, kind='total
     materialWeights /= np.sum(materialWeights)
     muPerCm = np.zeros(len(energyKeV),dtype=float)
     for mc in range(M):
-        muPerCm += materialWeights[mc]*xray.mu_elam(materialSymbols[mc],energyEV)
+        muPerCm += materialWeights[mc]*xray.mu_elam(materialSymbols[mc],energyEV, kind=kind)
     return muPerCm # list of mu factors per cm per density at different energies
 
 def getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens):
