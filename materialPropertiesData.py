@@ -239,5 +239,15 @@ materialProperties = {
         "weights": [0.046, 0.214, 0.740],
         "symbols": ["Na", "O", "W"],
         "density": 3.1
+    },
+    "spt0.63mol": {
+        "weights": [0.046, 0.214, 0.740],
+        "symbols": ["Na", "O", "W"],
+        "density": 2.65
+    },
+    "spt0.27mol": {
+        "weights": [0.022, 0.569, 0.35, 0.059],
+        "symbols": ["Na", "O", "W", "H"],
+        "density": 1.7
     }
 }
