@@ -7,7 +7,7 @@ from filterPerformance import *
 
 # Replace with your values:
 kvp = 120  # kVp
-filterMaterial = "Al"
+filterMaterial = "Al"  # can be "Fe" as well
 sampleMaterial = "sandstone"
 sampleDiameterMm = 25  # mm
 
@@ -29,7 +29,7 @@ import materialPropertiesData as mpd
 import filterPerformance as fp
 
 # Replace with your values:
-sampleMaterial = "sandstone"
+sampleMaterial = "sandstone" # options listed below in the next section
 sampleDiameterMm = 25   # mm
 kvp = 120               # kVp
 filterMaterial = "Al"
@@ -48,3 +48,5 @@ trans = xs.calcTransmission(
 transmission = np.sum(trans * spectrum) / np.sum(spectrum)
 print(transmission)
 ```
+## table of material list (26/08/2025):
+Valid materials are: sandstone, limestone, haematite, goethite, iron ore, feo, peek, al, xe, ti64, hardwood, softwood, ti, pmma, greenalite, dolomite, pyrex, teflon, siderite, pyrite, chalcopyrite, magnetite, xe500psi, air, nai1.5mol, spt, spt0.63mol, spt0.27mol, clastic, glass, carbonate, marble, caco3, titanium, wustite, acrylic.
