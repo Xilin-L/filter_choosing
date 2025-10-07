@@ -79,11 +79,11 @@ Parameters:
     kind – one of ‘total’ (default), ‘photo’, ‘coh’, and ‘incoh’ for total, photo-absorption, coherent scattering, and incoherent scattering cross sections, respectively.
 """
 
-def generateEmittedSpectrum(kvp=100,filterMaterial='Al',filterThicknessMm=0.5,energyResolutionKeV=2.355):
+def generateEmittedSpectrum(kvp=100,filterMaterial='Steel, Stainless (Type 302)',filterThicknessMm=0.5,energyResolutionKeV=2.355):
     # Generate initial unfiltered spectrum
     s = spekpy.Spek(kvp=kvp,th=90.,dk=1.,z=0.1,targ='W',shift=0.5)
     # Filter the spectrum (unit is 'mm')
-    s.filter('W',0.002) # self absorption by target
+    s.filter('W',0.004) # self absorption by target
     s.filter('C',0.3) # diamond window
     if isinstance(filterMaterial,list) and isinstance(filterThicknessMm, list): # for multiple filters
         if len(filterMaterial) != len(filterThicknessMm):
@@ -105,6 +105,15 @@ def generateEmittedSpectrum(kvp=100,filterMaterial='Al',filterThicknessMm=0.5,en
 def getSpekpyMaterialList():
     # if want to see a list of available materials in spekpy
     return spekpy.Spek.show_matls()
+
+def calcSpecAttenuation(energyKeV, spectrum, materialWeights, materialSymbols, dens, sampleDiameterMm):
+    # calculate attenuation of a spectrum by a material of given density
+    spectrum /= np.sum(spectrum)
+    transmissionPerCm = calcTransmission(energyKeV, materialWeights, materialSymbols, dens, 0.1*sampleDiameterMm)
+    totalTransmission = np.sum(spectrum*transmissionPerCm)
+    muPerCm = -np.log(totalTransmission)
+    return muPerCm
+
 
 def calcMassAttenuation(energyKeV, materialWeights, materialSymbols, kind='total'):
     # NOTE: kind can be: 'total' (default), 'photo', 'coh', 'incoh' for total,
