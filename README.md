@@ -48,5 +48,27 @@ trans = xs.calcTransmission(
 transmission = np.sum(trans * spectrum) / np.sum(spectrum)
 print(transmission)
 ```
+
+## For SNR analysis:
+
+```python
+from automation.qualityMeasures import *
+import matplotlib.pyplot as plt
+import os
+import re
+base_path = 'your/path/to/the/folder/that/contains/images' # such as '/home/xilin/projects/W7-20p33-21p30m__290kV_DeeTee'
+sample = QualityMeasuresAnalyzer(directoryPath=base_path, sampleMaterial="sampleMaterial", shape=(2920,2920)) # change "sampleMaterial" to anything within the list below if you don't simulate bhc or scattering, shape is size of detector images
+
+sample.computeSnr()
+"""
+it print the results in a few minuates (longer for larger images, 30 mins for the example size on my desktop) like:
+#### SNR Result ####
+SNR X = 10.3240
+SNR Y = 53.6396
+SNR Z = 9.8023
+"""
+```
+
+
 ## table of material list (26/08/2025):
 Valid materials are: sandstone, limestone, haematite, goethite, iron ore, feo, peek, al, xe, ti64, hardwood, softwood, ti, pmma, greenalite, dolomite, pyrex, teflon, siderite, pyrite, chalcopyrite, magnetite, xe500psi, air, nai1.5mol, spt, spt0.63mol, spt0.27mol, clastic, glass, carbonate, marble, caco3, titanium, wustite, acrylic.
