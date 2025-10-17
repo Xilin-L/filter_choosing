@@ -98,7 +98,7 @@ class QualityMeasuresAnalyzer:
 
         return result, scatEsti
 
-    def computeSnr(self,radiusFraction=1):
+    def computeSnr(self,kernelRangePx=9):
         """
         compute the signal-to-noise ratio
         can mask the snrZ if it is too high, the radiusFraction can be 0.9 to let the first stdv peak
@@ -121,9 +121,9 @@ class QualityMeasuresAnalyzer:
 
     def computeResolution(self):
         """compute the resolution of the tomographic dataset"""
-        resX, resPxX = resEst.findImageRes(self.tomoSliceX, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0.3)
-        resY, resPxY = resEst.findImageRes(self.tomoSliceY, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0.3)
-        resZ, resPxZ = resEst.findImageRes(self.tomoSliceZ, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0.3)
+        resX, resPxX = resEst.findImageRes(self.tomoSliceX, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0)
+        resY, resPxY = resEst.findImageRes(self.tomoSliceY, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0)
+        resZ, resPxZ = resEst.findImageRes(self.tomoSliceZ, pxSzMm=self.vxSizeMm, Ng=10, plot=False, cropFactor=0.4)
         # resZ is much lower than the other two, similar to the SNR result without masking
 
         print("\n#### Resolution Result ####")
@@ -168,15 +168,15 @@ class QualityMeasuresAnalyzer:
                 # bhc, bhcSimu, bhcTheo = self.computeBhc()
                 # scattering, scatEsti = self.computeScattering()
                 snr, snrRange = self.computeSnr()
-                # resolution, resolutionPx = self.computeResolution()
+                resolution, resolutionPx = self.computeResolution()
 
                 results = {
                     # "BHC": [bhc, bhcSimu, bhcTheo],
                     # "Scattering": [scattering, scatEsti],
                     "SNR": snr,
-                    "SNRRange": snrRange
-                    # "Resolution": resolution,
-                    # "ResolutionPx": resolutionPx
+                    "SNRRange": snrRange,
+                    "Resolution": resolution,
+                    "ResolutionPx": resolutionPx
                 }
 
                 # Save results to a file in the results directory
@@ -217,7 +217,7 @@ if __name__ == '__main__':
                 print(f"Sample Material: {sampleMaterial}, Binning: {binning}, Shape: {shape}")
 
                 analyzer = QualityMeasuresAnalyzer(folder_path, sampleMaterial, shape)
-                analyzer.analyseAll()
+                analyzer.computeScattering()
             else:
                 print(f"\nFolder name does not match pattern: {folder_name}")
 
