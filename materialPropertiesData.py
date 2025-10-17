@@ -270,6 +270,11 @@ materialProperties = {
         "symbols": ["H", "O", "Ca", "P"],
         "density": 1.28
     },
+    "ha400": {
+        "weights": [0.081, 0.756, 0.111, 0.052],
+        "symbols": ["H", "O", "Ca", "P"],
+        "density": 1.42
+    },
     "ha800": {
         "weights": [0.059, 0.659, 0.193, 0.089],
         "symbols": ["H", "O", "Ca", "P"],
@@ -279,5 +284,25 @@ materialProperties = {
         "weights": [0.043, 0.590, 0.251, 0.116],
         "symbols": ["H", "O", "Ca", "P"],
         "density": 1.91
-    }
+    },
+    "304sstl": {
+        "weights": [0.001, 0.001, 0.002, 0.18, 0.08, 0.74],
+        "symbols": ["C", "P", "S", "Cr", "Ni", "Fe"],
+        "density": 7.93
+    },
+    "h2o": {
+        "weights": [0.111894, 0.888106],
+        "symbols": ["H", "O"],
+        "density": 1.0
+    },
+    "tin": {
+        "weights": [1.0],
+        "symbols": ["Sn"],
+        "density": 7.3
+    },
+    "si": {
+        "weights": [1.0],
+        "symbols": ["Si"],
+        "density": 2.33
+    },
 }
