@@ -111,7 +111,7 @@ def calcSpecAttenuation(energyKeV, spectrum, materialWeights, materialSymbols, d
     spectrum /= np.sum(spectrum)
     transmissionPerCm = calcTransmission(energyKeV, materialWeights, materialSymbols, dens, 0.1*sampleDiameterMm)
     totalTransmission = np.sum(spectrum*transmissionPerCm)
-    muPerCm = -np.log(totalTransmission)
+    muPerCm = -np.log(totalTransmission)/sampleDiameterMm*10
     return muPerCm
 
 
