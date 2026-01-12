@@ -102,6 +102,124 @@ def generateEmittedSpectrum(kvp=100,filterMaterial='Steel, Stainless (Type 302)'
         spectrum = sp.ndimage.gaussian_filter(spectrum,sigma)
     return energyKeV, spectrum
 
+
+
+def estimateSourceFlux(machine, mode, sourceCurrentUa, voltageKv, powerWatt,
+                       exposureTimeSec, accumulationNum,
+                       filterMaterial='Steel, Stainless (Type 302)', filterThicknessMm=0.0):
+
+    standardMachines = {"L1", "L4", "ANU3", "RT1", "DB1", "DB2", "DB3"}
+    anu4Machines = {"ANU4"}
+
+    modeCurrentLimitUa = {"S": 20, "M": 60, "L": 500} # no actual limit for L mode
+
+    voltageRangeByMachineKv = {
+        "L1": (20, 160), "L4": (20, 160), "ANU3": (20, 160), "RT1": (20, 160),
+        "DB1": (20, 160), "DB2": (20, 160), "DB3": (20, 160),
+        "ANU4": (20, 300),
+    }
+
+    anu4ModeMaxPowerW = {"S": 10, "L": 80}  # no "M" for ANU4
+
+    def applyFilters(s):
+        if isinstance(filterMaterial, list) and isinstance(filterThicknessMm, list):
+            if len(filterMaterial) != len(filterThicknessMm):
+                raise ValueError("filterMaterial and filterThicknessMm lists must have same length")
+            for mat, thk in zip(filterMaterial, filterThicknessMm):
+                s.filter(mat, thk)
+        else:
+            s.filter(filterMaterial, filterThicknessMm)
+        return s
+
+    def spekFlux(s):
+        _, spectrum = s.get_spectrum(edges=False, flu=False)
+        return float(np.sum(spectrum))
+
+    def validateCommon():
+        if machine not in (standardMachines | anu4Machines):
+            raise ValueError(f"Unknown machine: {machine}")
+
+        if voltageKv is None:
+            raise ValueError("voltageKv must be provided")
+
+        vmin, vmax = voltageRangeByMachineKv[machine]
+        if not (vmin <= voltageKv <= vmax):
+            raise ValueError(f"voltageKv={voltageKv} kV out of range for {machine} ({vmin}–{vmax})")
+
+        if exposureTimeSec is None or exposureTimeSec <= 0:
+            raise ValueError("exposureTimeSec must be > 0")
+
+        if accumulationNum is None or accumulationNum <= 0:
+            raise ValueError("accumulationNum must be > 0")
+
+    def buildMas(currentUa):
+        return currentUa * exposureTimeSec * accumulationNum / 1000.0
+
+    def standardFlux():
+        if mode not in modeCurrentLimitUa:
+            raise ValueError(f"Unknown mode: {mode}")
+
+        if sourceCurrentUa is None:
+            raise ValueError("sourceCurrentUa must be provided for this machine")
+
+        maxCurrentUa = modeCurrentLimitUa[mode]
+        if sourceCurrentUa > maxCurrentUa:
+            raise ValueError(f"sourceCurrentUa={sourceCurrentUa} uA exceeds limit {maxCurrentUa} uA for mode={mode}")
+
+        s = spekpy.Spek(
+            kvp=voltageKv,
+            mas=buildMas(sourceCurrentUa),
+            th=90., dk=1., z=0.1, targ='W', shift=0.5
+        )
+        s = applyFilters(s)
+        return spekFlux(s)
+
+    def anu4Flux():
+        if mode not in anu4ModeMaxPowerW:
+            raise ValueError("ANU4 supports only mode 'S' and 'L'")
+
+        if powerWatt is None and sourceCurrentUa is None:
+            raise ValueError("For ANU4, provide at least one of powerWatt or sourceCurrentUa (voltageKv is required).")
+
+        currentUa = sourceCurrentUa
+        powerW = powerWatt
+
+        if powerW is None:
+            powerW = currentUa * voltageKv / 1000.0
+        if currentUa is None:
+            currentUa = powerW / voltageKv * 1000.0
+
+        maxPowerW = anu4ModeMaxPowerW[mode]
+        if powerW > maxPowerW:
+            raise ValueError(f"ANU4 mode={mode} exceeds max power: {powerW} W > {maxPowerW} W")
+
+        maxCurrentUa = maxPowerW / voltageKv * 1000.0
+        if currentUa > maxCurrentUa:
+            raise ValueError(f"sourceCurrentUa={currentUa} uA exceeds limit {maxCurrentUa:.3f} uA for ANU4 mode={mode}")
+
+        s = spekpy.Spek(
+            kvp=voltageKv,
+            mas=buildMas(currentUa),
+            trans=True, thick=4.,
+            dk=1., z=0.1, targ='W', shift=0.5
+        )
+        s = applyFilters(s)
+        energyKeV, spectrum = s.get_spectrum(edges=False, flu=False)
+        spectrumOut = detectedSpectrum(energyKeV, spectrum)
+        return np.sum(spectrumOut)
+
+    # ---- run ----
+    validateCommon()
+
+    if machine in standardMachines:
+        return standardFlux()
+    elif machine in anu4Machines:
+        return anu4Flux()
+
+    # shouldn't happen
+    raise ValueError(f"Unknown machine: {machine}")
+
+
 def getSpekpyMaterialList():
     # if want to see a list of available materials in spekpy
     return spekpy.Spek.show_matls()
