@@ -305,4 +305,9 @@ materialProperties = {
         "symbols": ["Si"],
         "density": 2.33
     },
+    "cu": {
+        "weights": [1.0],
+        "symbols": ["Cu"],
+        "density": 8.96
+    },
 }
