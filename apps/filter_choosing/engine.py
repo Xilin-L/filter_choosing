@@ -70,13 +70,8 @@ def runAll(
     )
 
     # 2) Scatter %
-    scatterPercent = scat.estimateMeasuredScatterAsPercentOfFlux(
-        energyKeV,
-        spectrumDet,
-        sampleMaterial,
-        sampleDiameterMm,
-        coneAngleDeg=coneAngleDeg,
-    )
+    scatterPercent = scat.estimateSampleScatterAsPercentOfTransmission(energyKeV, spectrumDet, sampleMaterial,
+                                                                       sampleDiameterMm, coneAngleDeg=coneAngleDeg)
 
     # 3) Beam hardening factor
     bhcFactor, voxelSizeMm, *_ = bhs.simulateBH(
