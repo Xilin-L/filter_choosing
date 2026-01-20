@@ -60,11 +60,11 @@ def setSpectrum(kvp, filterMaterial='Al', filterThicknessMm=0.5, plot=False):
     return energyKeV, spectrumDet
 
 
-def getRuleOfThumbFilterThickness(kVpeak,filterMaterial="Al", sampleMaterial="sandstone", sampleDiameterMm=25.0, 
+def getRuleOfThumbFilterThickness(kvp,filterMaterial="Al", sampleMaterial="sandstone", sampleDiameterMm=25.0,
                                   max_tFiltMm = 9.0):
     # rule of thumb for filter thickness is that which gives equivalent attenuation as D/e thickness of the sample
     # where D is sampleDiameter and e is 2.7183
-    energyKeV,spectrumIn = xs.generateEmittedSpectrum(kVpeak)
+    energyKeV,spectrumIn = xs.generateEmittedSpectrum(kvp)
     tSampFiltCm = 0.1*np.exp(-1.)*sampleDiameterMm # ROT filter attenuation 
     materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
     sampFiltTrans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, tSampFiltCm)
@@ -191,7 +191,7 @@ def getRotFilterImageStatsPerkVp(filterMaterial,sampleMaterial="sandstone",sampl
     # scatContrib = []
     for kVpeak in np.arange(kVPeakMin,kVPeakMax,10):
         energy.append(kVpeak)
-        t = getRuleOfThumbFilterThickness(kVpeak,filterMaterial,sampleMaterial,sampleDiameterMm)
+        t = getRuleOfThumbFilterThickness(kVpeak, filterMaterial, sampleMaterial, sampleDiameterMm)
         tFiltMm.append(t)
         energyKeV,spectrumIn = xs.generateEmittedSpectrum(kVpeak)
         imgStat = getImagingStatistics(energyKeV,spectrumIn,filterMaterial,t,sampleMaterial,sampleDiameterMm,coneAngleDeg)
