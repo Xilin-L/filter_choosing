@@ -235,7 +235,7 @@ materialProperties = {
         "symbols": ["Na", "I"],
         "density": 1.16
     },
-    "spt": {
+    "spt_saturated": {
         "weights": [0.046, 0.214, 0.740],
         "symbols": ["Na", "O", "W"],
         "density": 3.1
@@ -250,41 +250,41 @@ materialProperties = {
         "symbols": ["Na", "O", "W", "H"],
         "density": 1.7
     },
-    "badge": {
-        "weights": [0.741, 0.188, 0.071],
-        "symbols": ["C", "O", "H"],
-        "density": 1.16
-    },
-    "ha50": {
-        "weights": [0.107, 0.868, 0.017, 0.008],
-        "symbols": ["H", "O", "Ca", "P"],
-        "density": 1.19
-    },
-    "ha100": {
-        "weights": [0.103, 0.849, 0.033, 0.015],
-        "symbols": ["H", "O", "Ca", "P"],
-        "density": 1.22
-    },
-    "ha200": {
-        "weights": [0.095, 0.814, 0.062, 0.029],
-        "symbols": ["H", "O", "Ca", "P"],
-        "density": 1.28
-    },
-    "ha400": {
-        "weights": [0.081, 0.756, 0.111, 0.052],
-        "symbols": ["H", "O", "Ca", "P"],
-        "density": 1.42
-    },
-    "ha800": {
-        "weights": [0.059, 0.659, 0.193, 0.089],
-        "symbols": ["H", "O", "Ca", "P"],
-        "density": 1.66
-    },
-    "ha1200": {
-        "weights": [0.043, 0.590, 0.251, 0.116],
-        "symbols": ["H", "O", "Ca", "P"],
-        "density": 1.91
-    },
+    # "badge": {
+    #     "weights": [0.741, 0.188, 0.071],
+    #     "symbols": ["C", "O", "H"],
+    #     "density": 1.16
+    # },
+    # "ha50": {
+    #     "weights": [0.107, 0.868, 0.017, 0.008],
+    #     "symbols": ["H", "O", "Ca", "P"],
+    #     "density": 1.19
+    # },
+    # "ha100": {
+    #     "weights": [0.103, 0.849, 0.033, 0.015],
+    #     "symbols": ["H", "O", "Ca", "P"],
+    #     "density": 1.22
+    # },
+    # "ha200": {
+    #     "weights": [0.095, 0.814, 0.062, 0.029],
+    #     "symbols": ["H", "O", "Ca", "P"],
+    #     "density": 1.28
+    # },
+    # "ha400": {
+    #     "weights": [0.081, 0.756, 0.111, 0.052],
+    #     "symbols": ["H", "O", "Ca", "P"],
+    #     "density": 1.42
+    # },
+    # "ha800": {
+    #     "weights": [0.059, 0.659, 0.193, 0.089],
+    #     "symbols": ["H", "O", "Ca", "P"],
+    #     "density": 1.66
+    # },
+    # "ha1200": {
+    #     "weights": [0.043, 0.590, 0.251, 0.116],
+    #     "symbols": ["H", "O", "Ca", "P"],
+    #     "density": 1.91
+    # },
     "304sstl": {
         "weights": [0.001, 0.001, 0.002, 0.18, 0.08, 0.74],
         "symbols": ["C", "P", "S", "Cr", "Ni", "Fe"],
