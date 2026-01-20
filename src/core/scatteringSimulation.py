@@ -2,10 +2,10 @@ import numpy as np
 import scipy as sp
 
 
-import xraySimulation as xs
-import beamHardeningSimulation as bhs
-import materialPropertiesData as mpd
-import filterPerformance
+from . import xraySimulation as xs
+from . import beamHardeningSimulation as bhs
+from . import materialPropertiesData as mpd
+from . import filterPerformance
 
 from scipy.integrate import quad
 

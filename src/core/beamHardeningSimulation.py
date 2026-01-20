@@ -5,9 +5,9 @@ import skimage as ski
 
 from scipy.optimize import curve_fit
 
-import xraySimulation as xs
-import materialPropertiesData as mpd
-import filterPerformance
+from . import xraySimulation as xs
+from . import materialPropertiesData as mpd
+from . import filterPerformance
 
 
 

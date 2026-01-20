@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 
 import spekpy
 
-import xraySimulation as xs
-import materialPropertiesData as mpd
-import beamHardeningSimulation as bhs
+from . import xraySimulation as xs
+from . import materialPropertiesData as mpd
+from . import beamHardeningSimulation as bhs
 
 ### What are the requirements for the ideal filter? ###
 # 1 -X- rule of thumb (ROT), want filter to be equivalent to exp(-1) = 0.367 x diameter of sample * sample material * sample density. Maybe start here?
