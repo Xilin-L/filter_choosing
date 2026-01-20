@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 
 import skimage as ski
 
-import scipy as sp
-from scipy import ndimage
 from scipy.optimize import curve_fit
 
 import xraySimulation as xs

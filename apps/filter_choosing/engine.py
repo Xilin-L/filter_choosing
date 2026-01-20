@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import src.filterPerformance as fp
-import src.scatteringSimulation as scat
-import src.beamHardeningSimulation as bhs
-import src.xraySimulation as xs
-import src.materialPropertiesData as mpd
+from core import filterPerformance as fp
+from core import scatteringSimulation as scat
+from core import beamHardeningSimulation as bhs
+from core import xraySimulation as xs
+from core import materialPropertiesData as mpd
+
 import numpy as np
 
 FILTER_OPTIONS = ["Al", "Fe", "Cu", "304sstl"]

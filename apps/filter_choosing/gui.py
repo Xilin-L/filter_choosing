@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import src.materialPropertiesData as mpd
+from core import materialPropertiesData as mpd
 
 import tkinter as tk
 from tkinter import ttk, messagebox

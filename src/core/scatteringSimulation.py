@@ -1,6 +1,5 @@
 import numpy as np
 import scipy as sp
-import matplotlib.pyplot as plt
 import netCDF4 as nc
 
 
@@ -142,7 +141,7 @@ def transmissionTheoretical(tomoSlice,kvp=120,filterMaterial='Cu', filterThickne
                             materialName='feo', voxelSizeMm=0.1,offset=10000):
     sampleDiameterMm = 2 * getRadiusMm(tomoSlice, voxelSizeMm=voxelSizeMm, threshold=0.1, offset=offset)
     sampleThicknessCm = 0.1 * sampleDiameterMm
-    energyKeV, spectrum = filterPerformance.setSpectrum(kvp,filterMaterial,filterThicknessMm)
+    energyKeV, spectrum = filterPerformance.setSpectrum(kvp, filterMaterial, filterThicknessMm)
     materialWeights, materialSymbols, dens = mpd.getMaterialProperties(materialName)
     sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
     specNormalisd = spectrum / np.sum(spectrum)
