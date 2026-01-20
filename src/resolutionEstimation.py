@@ -99,7 +99,7 @@ def getDecorrLocalMax(d,prominence=0.01,width=10, distance=10):
 def unsharpMask(img,sigma):
     return img - sp.ndimage.gaussian_filter(img,sigma)
 
-def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=False,title=None,
+def calcSpecAttenuation(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=False,title=None,
                       prominence=0.01,width=10, distance=10, verbose=False):
     # max = np.max(d)
     # OR
@@ -138,7 +138,7 @@ def performDecorrScan(img,sList,maxVal,maxPos,maxSig,geometricMax=False,plot=Fal
             plt.title(title)
         plt.xlabel("Normalised frequency")
         plt.ylabel("Pearson cross corr.")
-        plt.legend(loc='upper right')
+        plt.legend(loc='lower right')
         plt.show()
     return maxVal, maxPos, maxSig
 
