@@ -38,7 +38,7 @@ def forwardFraction(energyKeV, coneAngleDeg):
     return num/den
 
 
-def estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngleDeg=10.):
+def estimateSampleScatterAsPercentOfTransmission(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngleDeg=10.):
     # estimate fraction of spectrum flux is detected as scatter
     # get material properties
     thicknessAvgCm = 0.064*sampleDiameterMm #average chord length
@@ -90,7 +90,8 @@ def estimateMeasuredScatterAsPercentOfFlux(energyKeV,spectrum,sampleMaterial,sam
     # ratio = np.sum(detectorScat) / np.sum(specTrans)/2
     # print("detector scatter / transmission = ", ratio)
 
-    return 100.0*scatEnergyFluence/(np.sum(specTrans)+scatEnergyFluence)
+    # scale by half for data fitting
+    return 100.0*scatEnergyFluence/(np.sum(specTrans)+scatEnergyFluence)/2
     # return 100.0*scatEnergyFluence/np.sum(spectrum)
 #
 
