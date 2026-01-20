@@ -24,7 +24,7 @@ jobs:
       - name: Build
         shell: pwsh
         run: |
-          pyinstaller --noconsole --onedir --name FilterChoosingTool -m apps.filter_choosing
+          pyinstaller --noconsole --onedir --name FilterChoosingTool apps/filter_choosing/entrypoint.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
