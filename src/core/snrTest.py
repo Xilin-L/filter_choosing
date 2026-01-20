@@ -9,9 +9,6 @@ from scipy import signal
 import matplotlib.pyplot as plt
 
 
-
-from resolutionEstimation import generateTestImage
-
 '''
 define the SNR/CNR as follows:
 dataRange/noiseStdv
