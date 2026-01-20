@@ -3,12 +3,8 @@
 import numpy as np
 
 import matplotlib.pyplot as plt
-import netCDF4 as nc
 
 import spekpy
-
-import larch
-from larch import xray
 
 import xraySimulation as xs
 import materialPropertiesData as mpd

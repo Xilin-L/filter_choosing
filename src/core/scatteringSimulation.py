@@ -1,6 +1,5 @@
 import numpy as np
 import scipy as sp
-import netCDF4 as nc
 
 
 import xraySimulation as xs
@@ -181,8 +180,7 @@ def calcScatteringFromData(kf, cf, df, tomoSlice, kvp, filterMaterial, filterThi
 
 if __name__ == '__main__':
 
-
-
+    import netCDF4 as nc
 
     proj = np.fromfile(
         '/home/xilin/projects/recon_ws/AM/AM_Kingston_BH_38mmCaCO3_SFT/proju16_raw/rawfiles_KF0000/expt_KF001080.raw',
