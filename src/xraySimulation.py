@@ -206,7 +206,7 @@ def estimateSourceFlux(machine, mode, sourceCurrentUa, voltageKv, powerWatt,
         s = applyFilters(s)
         energyKeV, spectrum = s.get_spectrum(edges=False, flu=False)
         spectrumOut = detectedSpectrum(energyKeV, spectrum)
-        return np.sum(spectrumOut)
+        return np.sum(spectrumOut)/50000
 
     # ---- run ----
     validateCommon()
@@ -224,11 +224,16 @@ def getSpekpyMaterialList():
     # if want to see a list of available materials in spekpy
     return spekpy.Spek.show_matls()
 
+def calcSpecTrans(energyKeV, spectrum, materialWeights, materialSymbols, dens, sampleDiameterMm):
+    # calculate transmission of a spectrum by a material of given density
+    spectrum /= np.sum(spectrum)
+    transmissionPerCm = calcTransmission(energyKeV, materialWeights, materialSymbols, dens, 0.1 * sampleDiameterMm)
+    totalTransmission = np.sum(spectrum * transmissionPerCm)
+    return totalTransmission
+
 def calcSpecAttenuation(energyKeV, spectrum, materialWeights, materialSymbols, dens, sampleDiameterMm):
     # calculate attenuation of a spectrum by a material of given density
-    spectrum /= np.sum(spectrum)
-    transmissionPerCm = calcTransmission(energyKeV, materialWeights, materialSymbols, dens, 0.1*sampleDiameterMm)
-    totalTransmission = np.sum(spectrum*transmissionPerCm)
+    totalTransmission = calcSpecTrans(energyKeV, spectrum, materialWeights, materialSymbols, dens, sampleDiameterMm)
     muPerCm = -np.log(totalTransmission)/sampleDiameterMm*10
     return muPerCm
 
