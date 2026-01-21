@@ -22,7 +22,12 @@ jobs:
 
       - name: Build
         shell: pwsh
-        run: pyinstaller --noconsole --onedir --name FilterChoosingTool --collect-submodules apps filter_choosing_entrypoint.py
+        run: |
+          pyinstaller --clean --noconsole --onedir --name FilterChoosingTool `
+            --collect-submodules apps `
+            --collect-all spekpy `
+            --collect-all xraydb `
+            filter_choosing_entrypoint.py
 
 
       - name: Upload artifact
