@@ -27,6 +27,7 @@ jobs:
             --collect-submodules apps `
             --collect-all spekpy `
             --collect-all xraydb `
+            --collect-submodules skimage `
             filter_choosing_entrypoint.py
 
 
