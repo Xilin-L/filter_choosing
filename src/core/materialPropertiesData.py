@@ -310,4 +310,24 @@ materialProperties = {
         "symbols": ["Cu"],
         "density": 8.96
     },
+    "coal": { # Bituminous coal
+        "weights": [0.844, 0.054, 0.067, 0.017, 0.018],
+        "symbols": ["C", "H", "O", "N", "S"],
+        "density": 1.35
+    },
+    "monzonite": {
+        "weights": [0.2575, 0.0846, 0.0688, 0.0208, 0.0617, 0.0373, 0.0231, 0.4461],
+        "symbols": ["Si", "Al", "Fe", "Mg", "Ca", "K", "Na", "O"],
+        "density": 2.64
+    },
+    "carbon fiber": {
+        "weights": [1.0],
+        "symbols": ["C"],
+        "density": 1.8
+    },
+    "graphite": {
+        "weights": [1],
+        "symbols": ["C"],
+        "density": 2.25
+    }
 }
