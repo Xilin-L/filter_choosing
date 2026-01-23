@@ -118,7 +118,7 @@ def estimateSourceFlux(machine, mode, sourceCurrentUa, voltageKv, powerWatt,
         "ANU4": (20, 300),
     }
 
-    anu4ModeMaxPowerW = {"S": 10, "L": 80}  # no "M" for ANU4
+    anu4ModeMaxPowerW = {"L": 80}  # no "M" for ANU4
 
     def applyFilters(s):
         if isinstance(filterMaterial, list) and isinstance(filterThicknessMm, list):
@@ -175,7 +175,7 @@ def estimateSourceFlux(machine, mode, sourceCurrentUa, voltageKv, powerWatt,
 
     def anu4Flux():
         if mode not in anu4ModeMaxPowerW:
-            raise ValueError("ANU4 supports only mode 'S' and 'L'")
+            raise ValueError("ANU4 supports only mode 'L'")
 
         if powerWatt is None and sourceCurrentUa is None:
             raise ValueError("For ANU4, provide at least one of powerWatt or sourceCurrentUa (voltageKv is required).")
