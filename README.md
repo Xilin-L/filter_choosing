@@ -35,7 +35,7 @@ A: Here it is solid, I have not added the porosity option yet.
 
 ## Q: For ANU4 there are two source modes S and L, but this system does not have two modes?
 
-A: I will fix this in the next version, just use L mode for now.
+A: Fixed, now there is only the L mode
 
 
 
