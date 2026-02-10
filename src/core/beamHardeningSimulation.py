@@ -166,33 +166,77 @@ def projectWithBeamHardeningModel(imgIn, A, n, angles=None, vxSzMm=1.0):
     return polyAtt
 
 
-def simulateBH(sampleDiameterMm=4., sampleDiameterVx=100, kvp=60, filterMaterial='Al',
-                  filterThicknessMm=0.5, materialName='marble', plotIdeal=False,plotBH=False, plotCurve=True,verbose=True):
+def simulateBH(sampleDiameterMm=4., sampleDiameterVx=100, kvp=60, filterMaterial='Al', filterThicknessMm=0.5,
+        materialName='marble', materialWeights=None, materialSymbols=None, density=None, plotIdeal=False, plotBH=False,
+        plotCurve=True, verbose=True, ):
     '''
-    simulate the beam hardening effect for a disk.
-    sampleDiameterVx: diameter of the sample in voxels
-    use the ratio of sampleDiameterMm/sampleDiameterVx to determine the resolution of the image
+    Simulate beam hardening effect for a disk.
+
+    Material input modes:
+      A) By name/composite descriptor (legacy):
+         materialName='marble'
+         or materialName=[[mat1, mat2], [w1, w2]]
+      B) By explicit properties:
+         materialWeights=[...], materialSymbols=[...], density=...
     '''
-    Ny = int(sampleDiameterVx*1.2)
-    Nx = int(sampleDiameterVx*1.2)
-    vxSzMm = sampleDiameterMm/sampleDiameterVx
+    Ny = int(sampleDiameterVx * 1.2)
+    Nx = int(sampleDiameterVx * 1.2)
+    vxSzMm = sampleDiameterMm / sampleDiameterVx
     imgShape = (Ny, Nx)
     img = generateCylinder(imgShape, diameterMm=sampleDiameterMm, vxSzMm=vxSzMm)
 
-    ### SIMPLE TEST ###
+    # Ideal projection
     sinogramIdeal = project(img, vxSzMm=vxSzMm)
 
     if plotIdeal:
-        plt.imshow(img, "gray") # plot the truth at given resolution
+        plt.imshow(img, "gray")
         plt.show()
-        plt.imshow(sinogramIdeal, "gray") # plot the ideal sinogram (ideal -> defect-free)
+        plt.imshow(sinogramIdeal, "gray")
         plt.show()
 
-    ### ADD SPECTRUM INFO ###
-    energyKeV, spectrum = filterPerformance.setSpectrum(kvp=kvp, filterMaterial=filterMaterial,
-                                                        filterThicknessMm=filterThicknessMm)
+    # Spectrum
+    energyKeV, spectrum = filterPerformance.setSpectrum(
+        kvp=kvp,
+        filterMaterial=filterMaterial,
+        filterThicknessMm=filterThicknessMm,
+    )
 
-    materialWeights, materialSymbols, dens = mpd.getMaterialProperties(materialName)
+    # -------- Material resolution --------
+    hasDirectProps = (
+        materialWeights is not None
+        or materialSymbols is not None
+        or density is not None
+    )
+
+    if hasDirectProps:
+        # all-or-nothing check
+        if materialWeights is None or materialSymbols is None or density is None:
+            raise ValueError(
+                "If using direct material inputs, provide materialWeights, materialSymbols, and density together."
+            )
+
+        materialWeights = list(materialWeights)
+        materialSymbols = list(materialSymbols)
+        dens = float(density)
+
+        if len(materialWeights) != len(materialSymbols):
+            raise ValueError("materialWeights and materialSymbols must have same length.")
+        if len(materialWeights) == 0:
+            raise ValueError("materialWeights/materialSymbols cannot be empty.")
+        if any(w < 0 for w in materialWeights):
+            raise ValueError("materialWeights must be non-negative.")
+
+        wsum = float(np.sum(materialWeights))
+        if wsum <= 0:
+            raise ValueError("Sum of materialWeights must be > 0.")
+
+        # normalize for safety
+        materialWeights = [float(w) / wsum for w in materialWeights]
+
+    else:
+        # legacy path
+        materialWeights, materialSymbols, dens = mpd.getMaterialProperties(materialName)
+
     sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, dens)
     A, n = estimateBeamHardening(spectrum, sampleAttPerCm, sampleDiameterMm, plot=plotCurve)
     if verbose:

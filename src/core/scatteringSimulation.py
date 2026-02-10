@@ -36,11 +36,60 @@ def forwardFraction(energyKeV, coneAngleDeg):
     return num/den
 
 
-def estimateSampleScatterAsPercentOfTransmission(energyKeV,spectrum,sampleMaterial,sampleDiameterMm,coneAngleDeg=10.):
-    # estimate fraction of spectrum flux is detected as scatter
-    # get material properties
-    thicknessAvgCm = 0.064*sampleDiameterMm #average chord length
-    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
+def estimateSampleScatterAsPercentOfTransmission(energyKeV, spectrum, sampleMaterial=None, sampleDiameterMm=0.0,
+                                                 coneAngleDeg=10.0, materialWeights=None, materialSymbols=None,
+                                                 density=None,):
+    """
+    Estimate scatter as percent of transmission.
+
+    Material input modes:
+      A) legacy:
+         sampleMaterial="sandstone"
+         or sampleMaterial=[[mat1, mat2], [w1, w2]]
+      B) explicit properties:
+         materialWeights=[...], materialSymbols=[...], density=...
+    """
+    # average chord length (same as before)
+    thicknessAvgCm = 0.064 * sampleDiameterMm
+
+    hasDirectProps = (
+        materialWeights is not None
+        or materialSymbols is not None
+        or density is not None
+    )
+
+    if hasDirectProps:
+        # all-or-nothing validation
+        if materialWeights is None or materialSymbols is None or density is None:
+            raise ValueError(
+                "If using direct material inputs, provide materialWeights, materialSymbols, and density together."
+            )
+
+        materialWeights = list(materialWeights)
+        materialSymbols = list(materialSymbols)
+        dens = float(density)
+
+        if len(materialWeights) != len(materialSymbols):
+            raise ValueError("materialWeights and materialSymbols must have same length.")
+        if len(materialWeights) == 0:
+            raise ValueError("materialWeights/materialSymbols cannot be empty.")
+        if any(w < 0 for w in materialWeights):
+            raise ValueError("materialWeights must be non-negative.")
+
+        wsum = float(np.sum(materialWeights))
+        if wsum <= 0:
+            raise ValueError("Sum of materialWeights must be > 0.")
+
+        # normalize for numerical safety
+        materialWeights = [float(w) / wsum for w in materialWeights]
+
+    else:
+        if sampleMaterial is None:
+            raise ValueError(
+                "Provide either sampleMaterial or (materialWeights, materialSymbols, density)."
+            )
+        materialWeights, materialSymbols, dens = mpd.getMaterialProperties(sampleMaterial)
+
     # estiamte amount of total scatter
     # Start with Compton ('absorption' component)
     sampIncohScat = xs.calcIncohScatter(energyKeV,materialWeights,materialSymbols,dens,thicknessAvgCm)

@@ -56,13 +56,54 @@ def setSpectrum(kvp, filterMaterial='Al', filterThicknessMm=0.5, plot=False):
     return energyKeV, spectrumDet
 
 
-def getRuleOfThumbFilterThickness(kvp,filterMaterial="Al", sampleMaterial="sandstone", sampleDiameterMm=25.0,
-                                  max_tFiltMm = 9.0):
-    # rule of thumb for filter thickness is that which gives equivalent attenuation as D/e thickness of the sample
-    # where D is sampleDiameter and e is 2.7183
-    energyKeV,spectrumIn = xs.generateEmittedSpectrum(kvp)
-    tSampFiltCm = 0.1*np.exp(-1.)*sampleDiameterMm # ROT filter attenuation 
-    materialWeights,materialSymbols,dens = mpd.getMaterialProperties(sampleMaterial)
+def getRuleOfThumbFilterThickness(kvp, filterMaterial="Al", sampleMaterial="sandstone", sampleDiameterMm=25.0,
+                                  max_tFiltMm=9.0, materialWeights=None, materialSymbols=None, density=None,):
+    """
+    Rule-of-thumb filter thickness: attenuation equivalent to D/e sample thickness.
+
+    Material input modes:
+      A) legacy:
+         sampleMaterial="sandstone"
+         or sampleMaterial=[[mat1, mat2], [w1, w2]]
+      B) explicit properties:
+         materialWeights=[...], materialSymbols=[...], density=...
+    """
+    # Rule-of-thumb equivalent sample thickness (cm): 0.1 * D(mm) / e
+    energyKeV, spectrumIn = xs.generateEmittedSpectrum(kvp)
+    tSampFiltCm = 0.1 * np.exp(-1.0) * sampleDiameterMm
+
+    # ---- resolve material properties ----
+    hasDirectProps = (
+        materialWeights is not None
+        or materialSymbols is not None
+        or density is not None
+    )
+
+    if hasDirectProps:
+        if materialWeights is None or materialSymbols is None or density is None:
+            raise ValueError(
+                "If using direct material inputs, provide materialWeights, materialSymbols, and density together."
+            )
+
+        materialWeights = np.asarray(materialWeights, dtype=float)
+        materialSymbols = list(materialSymbols)
+        dens = float(density)
+
+        if materialWeights.ndim != 1 or len(materialWeights) == 0:
+            raise ValueError("materialWeights must be a non-empty 1D list/array.")
+        if len(materialWeights) != len(materialSymbols):
+            raise ValueError("materialWeights and materialSymbols must have same length.")
+        if np.any(materialWeights < 0):
+            raise ValueError("materialWeights must be non-negative.")
+
+        wsum = float(np.sum(materialWeights))
+        if wsum <= 0:
+            raise ValueError("Sum of materialWeights must be > 0.")
+        materialWeights = (materialWeights / wsum).tolist()  # normalize
+
+    else:
+        materialWeights, materialSymbols, dens = mpd.getMaterialProperties(sampleMaterial)
+
     sampFiltTrans = xs.calcTransmission(energyKeV, materialWeights, materialSymbols, dens, tSampFiltCm)
     spectrumOut = spectrumIn*sampFiltTrans
     measTransSampFilt = np.sum(spectrumOut)/np.sum(spectrumIn)

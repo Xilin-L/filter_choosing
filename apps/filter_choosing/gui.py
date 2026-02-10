@@ -1,26 +1,18 @@
 from __future__ import annotations
 
-from core import materialPropertiesData as mpd
-
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from core import materialPropertiesData as mpd
 from .engine import (
     FILTER_OPTIONS,
     getRuleOfThumbFilterThickness,
     runAll,
 )
 
-# Minimal lists for v1. Replace/extend later.
-MACHINES = ["L1", "L4", "ANU3", "RT1", "DB1", "DB2", "DB3", "ANU4"]
-
-# Default modes; we'll adjust ANU4 when machine changes.
-MODES_DEFAULT = ["S", "M", "L"]
-
 SAMPLE_MATERIALS = sorted(
     set(mpd.materialProperties.keys()) | set(mpd.materialNameMapping.keys())
 )
-
 
 
 def _safeFloat(s: str, fieldName: str) -> float:
@@ -39,33 +31,38 @@ def _safeInt(s: str, fieldName: str) -> int:
 
 def main() -> None:
     root = tk.Tk()
-    root.title("Filter Choosing Tool (Basic)")
+    root.title("Filter Choosing Tool")
 
     # -----------------------------
     # Variables
     # -----------------------------
-    machineVar = tk.StringVar(value=MACHINES[0])
-    modeVar = tk.StringVar(value="S")
     filterVar = tk.StringVar(value=FILTER_OPTIONS[0])
-    defaultSample = "sandstone" if "sandstone" in SAMPLE_MATERIALS else SAMPLE_MATERIALS[0]
-    sampleMaterialVar = tk.StringVar(value=defaultSample)
+    defaultMat1 = "sandstone" if "sandstone" in SAMPLE_MATERIALS else SAMPLE_MATERIALS[0]
+    defaultMat2 = "air" if "air" in SAMPLE_MATERIALS else SAMPLE_MATERIALS[0]
+
+    material1Var = tk.StringVar(value=defaultMat1)
+    material2Var = tk.StringVar(value=defaultMat2)
+
+    useMaterial2Var = tk.BooleanVar(value=False)
 
     kvpVar = tk.StringVar(value="120")
-    sampleDiameterVar = tk.StringVar(value="10.0")
+    sampleDiameterVar = tk.StringVar(value="10.0")  # mm
 
-    # ROT output and main filter thickness
+    # Mixture controls
+    volFrac2Var = tk.StringVar(value="0.10")        # volume fraction of material2 [0,1]
+
+    # Tube controls (extra filtering)
+    tubeEnabledVar = tk.BooleanVar(value=True)
+    tubeMaterialVar = tk.StringVar(value="Al")
+    tubeThicknessVar = tk.StringVar(value="2.0")    # mm
+
+    # ROT + chosen filter thickness
     rotThicknessVar = tk.StringVar(value="")
     filterThicknessVar = tk.StringVar(value="0.0")
 
     # Scatter/BH controls
     coneAngleVar = tk.StringVar(value="10.0")
     sampleDiameterVxVar = tk.StringVar(value="256")
-
-    # Flux inputs
-    sourceCurrentUaVar = tk.StringVar(value="60")   # allow blank later if you want
-    powerWattVar = tk.StringVar(value="")           # optional
-    exposureTimeVar = tk.StringVar(value="1.0")
-    accumulationNumVar = tk.StringVar(value="1")
 
     # -----------------------------
     # Layout
@@ -79,55 +76,74 @@ def main() -> None:
 
     row = 0
 
-    def addLabelEntry(label: str, var: tk.StringVar):
+    def addLabelEntry(label: str, var: tk.StringVar, state: str = "normal"):
         nonlocal row
         ttk.Label(frm, text=label).grid(row=row, column=0, sticky="w", pady=2)
-        e = ttk.Entry(frm, textvariable=var)
+        e = ttk.Entry(frm, textvariable=var, state=state)
         e.grid(row=row, column=1, sticky="ew", pady=2)
         row += 1
         return e
 
-    def addLabelCombo(label: str, var: tk.StringVar, values: list[str]):
+    def addLabelCombo(label: str, var: tk.StringVar, values: list[str], state: str = "readonly"):
         nonlocal row
         ttk.Label(frm, text=label).grid(row=row, column=0, sticky="w", pady=2)
-        c = ttk.Combobox(frm, textvariable=var, values=values, state="readonly")
+        c = ttk.Combobox(frm, textvariable=var, values=values, state=state)
         c.grid(row=row, column=1, sticky="ew", pady=2)
         row += 1
         return c
 
-    machineCombo = addLabelCombo("Machine", machineVar, MACHINES)
-    modeCombo = addLabelCombo("Mode", modeVar, MODES_DEFAULT)
+    # Base inputs
     addLabelEntry("kVp", kvpVar)
-
     addLabelCombo("Filter material", filterVar, FILTER_OPTIONS)
     addLabelEntry("Filter thickness (mm)", filterThicknessVar)
 
-    addLabelCombo("Sample material", sampleMaterialVar, SAMPLE_MATERIALS)
-    addLabelEntry("Sample diameter (mm)", sampleDiameterVar)
+    addLabelCombo("Material 1", material1Var, SAMPLE_MATERIALS)
+
+    useMaterial2Check = ttk.Checkbutton(
+        frm,
+        text="Enable material 2 (mixture mode)",
+        variable=useMaterial2Var,
+    )
+    useMaterial2Check.grid(row=row, column=0, columnspan=2, sticky="w", pady=2)
+    row += 1
+
+    material2Combo = addLabelCombo("Material 2", material2Var, SAMPLE_MATERIALS, state="disabled")
+    volFrac2Entry = addLabelEntry("Volume fraction of material 2 (0 to 1)", volFrac2Var, state="disabled")
+
+    addLabelEntry("Sample diameter/thickness (mm)", sampleDiameterVar)
 
     ttk.Separator(frm).grid(row=row, column=0, columnspan=2, sticky="ew", pady=8)
     row += 1
 
-    addLabelEntry("Cone angle (deg) [scatter]", coneAngleVar)
-    addLabelEntry("Simulation diameter voxels [BH]", sampleDiameterVxVar)
+    # Tube section
+    tubeEnabledCheck = ttk.Checkbutton(
+        frm,
+        text="Enable tube as extra filtering",
+        variable=tubeEnabledVar,
+    )
+    tubeEnabledCheck.grid(row=row, column=0, columnspan=2, sticky="w", pady=2)
+    row += 1
+
+    tubeMaterialCombo = addLabelCombo("Tube material", tubeMaterialVar, ["Al"], state="readonly")
+    tubeThicknessEntry = addLabelEntry("Tube thickness (mm)", tubeThicknessVar)
 
     ttk.Separator(frm).grid(row=row, column=0, columnspan=2, sticky="ew", pady=8)
     row += 1
 
-    addLabelEntry("Source current (µA) [flux]", sourceCurrentUaVar)
-    addLabelEntry("Power (W) [optional]", powerWattVar)
-    addLabelEntry("Exposure time (s)", exposureTimeVar)
-    addLabelEntry("Accumulation num", accumulationNumVar)
+    # Advanced controls
+    addLabelEntry("Cone angle (deg)", coneAngleVar)
+    addLabelEntry("Simulation diameter voxels", sampleDiameterVxVar)
 
     ttk.Separator(frm).grid(row=row, column=0, columnspan=2, sticky="ew", pady=8)
     row += 1
 
-    # ROT row (output + buttons)
+    # ROT row
     ttk.Label(frm, text="ROT thickness (mm)").grid(row=row, column=0, sticky="w", pady=2)
     rotEntry = ttk.Entry(frm, textvariable=rotThicknessVar, state="readonly")
     rotEntry.grid(row=row, column=1, sticky="ew", pady=2)
     row += 1
 
+    # Buttons
     btnRow = ttk.Frame(frm)
     btnRow.grid(row=row, column=0, columnspan=2, sticky="ew", pady=6)
     btnRow.columnconfigure(0, weight=1)
@@ -136,58 +152,85 @@ def main() -> None:
 
     computeRotBtn = ttk.Button(btnRow, text="Compute ROT")
     useRotBtn = ttk.Button(btnRow, text="Use ROT thickness")
-    runAllBtn = ttk.Button(btnRow, text="Run All")
+    runBtn = ttk.Button(btnRow, text="Run")
 
     computeRotBtn.grid(row=0, column=0, sticky="ew", padx=2)
     useRotBtn.grid(row=0, column=1, sticky="ew", padx=2)
-    runAllBtn.grid(row=0, column=2, sticky="ew", padx=2)
-
+    runBtn.grid(row=0, column=2, sticky="ew", padx=2)
     row += 1
 
-    # Output text box
+    # Output
     ttk.Label(frm, text="Output").grid(row=row, column=0, sticky="nw", pady=(10, 2))
-    outputTxt = tk.Text(frm, height=10, wrap="word")
+    outputTxt = tk.Text(frm, height=14, wrap="word")
     outputTxt.grid(row=row, column=1, sticky="nsew", pady=(10, 2))
     frm.rowconfigure(row, weight=1)
-    row += 1
 
     def writeOutput(text: str) -> None:
         outputTxt.delete("1.0", "end")
         outputTxt.insert("1.0", text)
 
     # -----------------------------
-    # Dynamic behavior
+    # Dynamic UI state
     # -----------------------------
-    def updateModesForMachine(*_):
-        m = machineVar.get()
-        if m == "ANU4":
-            modes = ["S", "L"]
-            if modeVar.get() not in modes:
-                modeVar.set("S")
-        else:
-            modes = ["S", "M", "L"]
-            if modeVar.get() not in modes:
-                modeVar.set("S")
-        modeCombo["values"] = modes
+    def updateUiState(*_):
+        useMat2 = useMaterial2Var.get()
+        tubeOn = tubeEnabledVar.get()
 
-    machineCombo.bind("<<ComboboxSelected>>", updateModesForMachine)
-    updateModesForMachine()
+        material2Combo.configure(state="readonly" if useMat2 else "disabled")
+        volFrac2Entry.configure(state="normal" if useMat2 else "disabled")
+
+        tubeMaterialCombo.configure(state="readonly" if tubeOn else "disabled")
+        tubeThicknessEntry.configure(state="normal" if tubeOn else "disabled")
 
     # -----------------------------
-    # Button callbacks
+    # Callbacks
     # -----------------------------
+    def _readInputs():
+        kvp = _safeFloat(kvpVar.get().strip(), "kVp")
+        filterMaterial = filterVar.get()
+        sampleDiameterMm = _safeFloat(sampleDiameterVar.get().strip(), "Sample diameter/thickness (mm)")
+
+        useMat2 = useMaterial2Var.get()
+        material1 = material1Var.get()
+        material2 = material2Var.get() if useMat2 else None
+        volFrac2 = _safeFloat(volFrac2Var.get().strip(), "Volume fraction of material 2") if useMat2 else 0.0
+
+        if not (0.0 <= volFrac2 <= 1.0):
+            raise ValueError("Volume fraction of material 2 must be in [0, 1].")
+
+        tubeOn = tubeEnabledVar.get()
+        tubeMaterial = tubeMaterialVar.get()
+        tubeThicknessMm = _safeFloat(tubeThicknessVar.get().strip(), "Tube thickness (mm)") if tubeOn else 0.0
+
+        coneAngleDeg = _safeFloat(coneAngleVar.get().strip(), "Cone angle (deg)")
+        sampleDiameterVx = _safeInt(sampleDiameterVxVar.get().strip(), "Simulation diameter voxels")
+
+        return {
+            "kvp": kvp,
+            "filterMaterial": filterMaterial,
+            "sampleDiameterMm": sampleDiameterMm,
+            "material1": material1,
+            "material2": material2,
+            "volumeFractionMaterial2": volFrac2,
+            "tubeMaterial": tubeMaterial,
+            "tubeThicknessMm": tubeThicknessMm,
+            "coneAngleDeg": coneAngleDeg,
+            "sampleDiameterVx": sampleDiameterVx,
+        }
+
     def onComputeRot():
         try:
-            kvp = _safeFloat(kvpVar.get().strip(), "kVp")
-            sampleDiameterMm = _safeFloat(sampleDiameterVar.get().strip(), "Sample diameter (mm)")
+            p = _readInputs()
             tRot = getRuleOfThumbFilterThickness(
-                kvp=kvp,
-                filterMaterial=filterVar.get(),
-                sampleMaterial=sampleMaterialVar.get(),
-                sampleDiameterMm=sampleDiameterMm,
+                kvp=p["kvp"],
+                filterMaterial=p["filterMaterial"],
+                sampleDiameterMm=p["sampleDiameterMm"],
+                material1=p["material1"],
+                material2=p["material2"],
+                volumeFractionMaterial2=p["volumeFractionMaterial2"],
             )
-            rotThicknessVar.set(f"{tRot:.6g}")
-            writeOutput(f"Rule-of-thumb thickness:\n  {tRot:.6g} mm\n")
+            rotThicknessVar.set(f"{tRot:.4f}")
+            writeOutput(f"Rule-of-thumb thickness:\n  {tRot:.4f} mm\n")
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
@@ -198,59 +241,43 @@ def main() -> None:
             return
         filterThicknessVar.set(t)
 
-    def onRunAll():
+    def onRun():
         try:
-            machine = machineVar.get()
-            mode = modeVar.get()
-
-            kvp = _safeFloat(kvpVar.get().strip(), "kVp")
+            p = _readInputs()
             filterThicknessMm = _safeFloat(filterThicknessVar.get().strip(), "Filter thickness (mm)")
-            sampleDiameterMm = _safeFloat(sampleDiameterVar.get().strip(), "Sample diameter (mm)")
-
-            coneAngleDeg = _safeFloat(coneAngleVar.get().strip(), "Cone angle (deg)")
-            sampleDiameterVx = _safeInt(sampleDiameterVxVar.get().strip(), "Simulation diameter voxels")
-
-            exposureTimeSec = _safeFloat(exposureTimeVar.get().strip(), "Exposure time (s)")
-            accumulationNum = _safeInt(accumulationNumVar.get().strip(), "Accumulation num")
-
-            # Allow blank for current/power
-            currentStr = sourceCurrentUaVar.get().strip()
-            powerStr = powerWattVar.get().strip()
-            sourceCurrentUa = float(currentStr) if currentStr != "" else None
-            powerWatt = float(powerStr) if powerStr != "" else None
 
             results = runAll(
-                machine=machine,
-                mode=mode,
-                kvp=kvp,
-                filterMaterial=filterVar.get(),
+                kvp=p["kvp"],
+                filterMaterial=p["filterMaterial"],
                 filterThicknessMm=filterThicknessMm,
-                sampleMaterial=sampleMaterialVar.get(),
-                sampleDiameterMm=sampleDiameterMm,
-                coneAngleDeg=coneAngleDeg,
-                sampleDiameterVx=sampleDiameterVx,
-                sourceCurrentUa=sourceCurrentUa,
-                powerWatt=powerWatt,
-                exposureTimeSec=exposureTimeSec,
-                accumulationNum=accumulationNum,
+                sampleDiameterMm=p["sampleDiameterMm"],
+                material1=p["material1"],
+                material2=p["material2"],
+                volumeFractionMaterial2=p["volumeFractionMaterial2"],
+                coneAngleDeg=p["coneAngleDeg"],
+                sampleDiameterVx=p["sampleDiameterVx"],
+                tubeThicknessMm=p["tubeThicknessMm"],
+                tubeMaterial=p["tubeMaterial"],
             )
 
-            # Pretty print
             lines = []
             lines.append("Inputs:")
-            lines.append(f"  machine={machine}, mode={mode}")
-            lines.append(f"  kvp={kvp}")
-            lines.append(f"  filter={filterVar.get()}, thicknessMm={filterThicknessMm}")
-            lines.append(f"  sampleMaterial={sampleMaterialVar.get()}, sampleDiameterMm={sampleDiameterMm}")
-            lines.append(f"  coneAngleDeg={coneAngleDeg}, sampleDiameterVx={sampleDiameterVx}")
-            lines.append(f"  sourceCurrentUa={sourceCurrentUa}, powerWatt={powerWatt}")
-            lines.append(f"  exposureTimeSec={exposureTimeSec}, accumulationNum={accumulationNum}")
+            lines.append(f"  kvp = {p['kvp']:.4f}")
+            lines.append(f"  filter = {p['filterMaterial']}, thickness mm = {filterThicknessMm:.4f}")
+            lines.append(f"  material 1 = {p['material1']}")
+            lines.append(f"  material 2 = {p['material2'] if p['material2'] else '-'}")
+            lines.append(f"  vol frac material 2 = {p['volumeFractionMaterial2']:.4f}")
+            lines.append(f"  sample diameter/thickness mm = {p['sampleDiameterMm']:.4f}")
+            lines.append(f"  tube material = {p['tubeMaterial'] if p['tubeThicknessMm'] > 0 else '-'}")
+            lines.append(f"  tube thickness mm = {p['tubeThicknessMm']:.4f}")
+            lines.append(f"  cone angle deg = {p['coneAngleDeg']:.4f}")
+            lines.append(f"  sample diameter vx = {p['sampleDiameterVx']}")
             lines.append("")
             lines.append("Outputs:")
-            lines.append(f"  transmission percentage = {results['transmission percentage']:.4f}")
-            lines.append(f"  effective attenuation per cm = {results['effective attenuation per cm']:.3f}")
-            lines.append(f"  scatter/transmission in percentage = {results['scatter/transmission in percentage']:.4f}")
-            lines.append(f"  bhc factor = {results['bhc factor']:.4f}")
+
+            # print all outputs from engine (already rounded in engine)
+            for k, v in results.items():
+                lines.append(f"  {k} = {v}")
 
             writeOutput("\n".join(lines))
 
@@ -259,7 +286,11 @@ def main() -> None:
 
     computeRotBtn.config(command=onComputeRot)
     useRotBtn.config(command=onUseRot)
-    runAllBtn.config(command=onRunAll)
+    runBtn.config(command=onRun)
 
-    root.minsize(700, 520)
+    useMaterial2Var.trace_add("write", updateUiState)
+    tubeEnabledVar.trace_add("write", updateUiState)
+    updateUiState()
+
+    root.minsize(800, 620)
     root.mainloop()
