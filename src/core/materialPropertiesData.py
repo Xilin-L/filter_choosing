@@ -329,5 +329,11 @@ materialProperties = {
         "weights": [1],
         "symbols": ["C"],
         "density": 2.25
+    },
+    "al6061": {
+        "weights": [0.974486, 0.010025, 0.006015, 0.003509, 0.002757, 0.001955, 0.001253],
+        "symbols": ["Al", "Mg", "Si", "Fe", "Cu", "Cr", "Zn"],
+        "density": 2.70
     }
+
 }
