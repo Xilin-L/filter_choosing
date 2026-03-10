@@ -46,7 +46,7 @@ def main() -> None:
     volFrac2Var = tk.StringVar(value="0.10")  # volume fraction of material2 [0,1]
 
     # Tube controls (extra filtering)
-    tubeEnabledVar = tk.BooleanVar(value=True)
+    tubeEnabledVar = tk.BooleanVar(value=False)
     tubeMaterialVar = tk.StringVar(value="Al")
     tubeThicknessVar = tk.StringVar(value="2.0")  # mm
 
@@ -135,7 +135,7 @@ def main() -> None:
     row = 1
     ttk.Separator(frm).grid(row=row, column=0, columnspan=2, sticky="ew", pady=8)
     row += 1
-    ttk.Label(frm, text="Advanced & Tube Settings").grid(row=row, column=0, columnspan=2, sticky="w", pady=2)
+    ttk.Label(frm, text="Tube Settings").grid(row=row, column=0, columnspan=2, sticky="w", pady=2)
     row += 1
 
     def addLabelEntry(label: str, var: tk.StringVar, state: str = "normal"):
@@ -165,29 +165,45 @@ def main() -> None:
     ttk.Separator(frm).grid(row=row, column=0, columnspan=2, sticky="ew", pady=8)
     row += 1
 
-    # Advanced controls
-    addLabelEntry("Cone angle (deg)", coneAngleVar)
-    addLabelEntry("Simulation diameter voxels", sampleDiameterVxVar)
+    # -----------------------------------------------------------------
+    # BOTTOM SECTION: Action Buttons & Optimization Settings
+    # -----------------------------------------------------------------
+    actionFrm = ttk.Frame(frm)
+    actionFrm.grid(row=row, column=0, columnspan=2, sticky="ew", pady=15)
+    actionFrm.columnconfigure(0, weight=1)
+    actionFrm.columnconfigure(1, weight=1)
 
-    ttk.Label(frm, text="Optimize For:").grid(row=row, column=0, sticky="w", pady=2)
-    priFrame = ttk.Frame(frm)
-    priFrame.grid(row=row, column=1, sticky="w")
+    # -- LEFT: Single Run Group --
+    runGroup = ttk.LabelFrame(actionFrm, text="Single Configuration", padding=10)
+    runGroup.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+    runGroup.columnconfigure(1, weight=1)
+
+    # Move Advanced Controls here
+    ttk.Label(runGroup, text="Cone angle (deg)").grid(row=0, column=0, sticky="w", pady=2, padx=(0, 5))
+    ttk.Entry(runGroup, textvariable=coneAngleVar).grid(row=0, column=1, sticky="ew", pady=2)
+
+    ttk.Label(runGroup, text="Simulation diam (voxels)").grid(row=1, column=0, sticky="w", pady=2, padx=(0, 5))
+    ttk.Entry(runGroup, textvariable=sampleDiameterVxVar).grid(row=1, column=1, sticky="ew", pady=2)
+
+    # Run Button
+    runBtn = ttk.Button(runGroup, text="Run Full Simulation")
+    runBtn.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+
+    # -- RIGHT: Optimization Sweep Group --
+    optGroup = ttk.LabelFrame(actionFrm, text="Optimization Sweep", padding=10)
+    optGroup.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+    optGroup.columnconfigure(1, weight=1)
+
+    ttk.Label(optGroup, text="Priority:").grid(row=0, column=0, sticky="w", pady=2)
+    priFrame = ttk.Frame(optGroup)
+    priFrame.grid(row=0, column=1, sticky="w", pady=2)
     ttk.Radiobutton(priFrame, text="Transmission", variable=priorityVar, value="transmission").pack(side="left",
                                                                                                     padx=(0, 10))
-    ttk.Radiobutton(priFrame, text="BHC (Beam Quality)", variable=priorityVar, value="bhc").pack(side="left")
-    row += 1
+    ttk.Radiobutton(priFrame, text="BHC", variable=priorityVar, value="bhc").pack(side="left")
 
-    # Action Buttons (Bottom)
-    btnRow = ttk.Frame(frm)
-    btnRow.grid(row=row, column=0, columnspan=2, sticky="ew", pady=15)
-    btnRow.columnconfigure(0, weight=1)
-    btnRow.columnconfigure(1, weight=1)
+    optimizeBtn = ttk.Button(optGroup, text="Optimize Sweep")
+    optimizeBtn.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 0))
 
-    runBtn = ttk.Button(btnRow, text="Run Full Simulation")
-    optimizeBtn = ttk.Button(btnRow, text="Optimize Sweep")
-
-    runBtn.grid(row=0, column=0, sticky="ew", padx=2)
-    optimizeBtn.grid(row=0, column=1, sticky="ew", padx=2)
     row += 1
 
     # Output
