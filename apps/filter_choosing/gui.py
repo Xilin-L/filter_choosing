@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import os
+import re
 
 from core import materialPropertiesData as mpd
 from .engine import (FILTER_OPTIONS, getRuleOfThumbFilterThickness, runAll, optimizeScanParameters)
@@ -23,9 +25,32 @@ def _safeInt(s: str, fieldName: str) -> int:
         raise ValueError(f"{fieldName} must be an integer.")
 
 
+def _get_app_version() -> str:
+    """Reads the version dynamically from pyproject.toml so we don't have to hardcode it."""
+    try:
+        # __file__ is apps/filter_choosing/gui.py
+        # Go up two directories to reach the project root
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.dirname(os.path.dirname(current_dir))
+        toml_path = os.path.join(root_dir, "pyproject.toml")
+
+        if os.path.exists(toml_path):
+            with open(toml_path, "r", encoding="utf-8") as f:
+                content = f.read()
+                # Search for: version = "1.x.x"
+                match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
+                if match:
+                    return match.group(1)
+    except Exception:
+        pass
+
+    # Ultimate fallback if the file is missing or moved
+    return " not found"
+
 def main() -> None:
     root = tk.Tk()
-    root.title("Filter Choosing Tool")
+    app_version = _get_app_version()
+    root.title(f"Filter Choosing Tool v{app_version}")
 
     # -----------------------------
     # Variables
