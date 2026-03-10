@@ -13,11 +13,11 @@ from core import materialPropertiesData as mpd
 FILTER_OPTIONS = ["Al", "Fe", "Cu", "304sstl"]
 
 
-def toSpekpyFilterMaterial(filterCode: str) -> str:
-    # SpekPy has 302; your lab option is 304sstl and you consider them similar.
-    if filterCode == "304sstl":
-        return "Steel, Stainless (Type 302)"
-    return filterCode
+# def toSpekpyFilterMaterial(filterCode: str) -> str:
+#     # SpekPy has 302; your lab option is 304sstl and you consider them similar.
+#     if filterCode == "304sstl":
+#         return "Steel, Stainless (Type 302)"
+#     return filterCode
 
 
 def _normalizeTwoFractions(a: float, b: float) -> tuple[float, float]:
@@ -319,3 +319,91 @@ def runAll(
         # "material weights": materialWeights,
         # "material symbols": materialSymbols,
     }
+
+
+def optimizeScanParameters(kvpList: list[float], filterMaterial: str, sampleDiameterMm: float, material1: str,
+        material2: str | None = None, volumeFractionMaterial2: float = 0.0, targetBhcMax: float = 1.1,
+        targetTransMin: float = 0.05, targetTransMax: float = 0.35, priority: str = "transmission",
+        tubeMaterial: str = "Al", tubeThicknessMm: float = 2.0) -> list[dict]:
+    """
+    Fast grid search to find combinations of kVp and filter thickness.
+    Searches around the Rule-of-Thumb thickness (0.5 * ROT to 1.5 * ROT).
+
+    - Priority "transmission": Maximizes THROUGHPUT (Sample Trans * Flux) across
+      ALL configurations that satisfy the transmission bounds [5%, 35%].
+      It ignores the BHC target during selection.
+    - Priority "bhc": Minimizes BHC factor within the transmission bounds.
+    """
+    materialWeights, materialSymbols, density, _ = _buildEquivalentMaterialProperties(material1=material1,
+        material2=material2, volumeFractionMaterial2=volumeFractionMaterial2, )
+
+    valid_configurations = []
+
+    # Match ROT step size logic
+    if "Al" in filterMaterial:
+        thicknessStepMm = 0.5
+    elif any(mat in filterMaterial for mat in ["Fe", "Cu", "304sstl"]):
+        thicknessStepMm = 0.1
+    else:
+        thicknessStepMm = 0.1
+
+    for kvp in kvpList:
+        energyKeV, rawSpectrumIn = xs.generateEmittedSpectrum(kvp, filterThicknessMm=0.0)
+
+        # Apply tube filtering as a baseline
+        if tubeThicknessMm > 0:
+            spectrumIn = fp.getFilteredSpectrum(energyKeV, rawSpectrumIn, tubeMaterial, tubeThicknessMm)
+        else:
+            spectrumIn = rawSpectrumIn
+
+        sampleAttPerCm = xs.getMaterialAttenuation(energyKeV, materialWeights, materialSymbols, density)
+
+        configs_for_kvp = []
+
+        # 1. Centering search window on Rule of Thumb
+        rot_t = getRuleOfThumbFilterThickness(kvp, filterMaterial, sampleDiameterMm, material1, material2,
+            volumeFractionMaterial2)
+        start_t = max(0.0, 0.5 * rot_t)
+        end_t = 1.5 * rot_t
+
+        for t_mm in np.arange(start_t, end_t + thicknessStepMm, thicknessStepMm):
+            spectrumFilt = fp.getFilteredSpectrum(energyKeV, spectrumIn, filterMaterial, t_mm)
+            spectrumDet = xs.detectedSpectrum(energyKeV, spectrumFilt)
+
+            if np.sum(spectrumDet) <= 0:
+                continue
+
+            # Calculate Transmission for boundary check
+            totalTransmission = xs.calcSpecTrans(energyKeV, spectrumDet, materialWeights, materialSymbols, density,
+                sampleDiameterMm)
+
+            # --- BOUNDARY CHECK (5% to 35%) ---
+            if targetTransMin <= totalTransmission <= targetTransMax:
+                # Calculate Flux for reference and throughput optimization
+                fluxFraction = np.sum(spectrumFilt) / np.sum(rawSpectrumIn)
+
+                # Fast BHC estimation
+                A, n = bhs.estimateBeamHardening(spectrumDet, sampleAttPerCm, sampleDiameterMm, plot=False)
+                bhcFactor = 1.0 / n
+
+                configs_for_kvp.append({"kvp": float(kvp), "filterThicknessMm": round(float(t_mm), 2),
+                    "transmission": round(float(totalTransmission * 100), 2),
+                    "flux": round(float(fluxFraction * 100), 4), "bhcFactor": round(float(bhcFactor), 4),
+                    "meetsBhcTarget": bhcFactor <= targetBhcMax})
+
+        if not configs_for_kvp:
+            continue
+
+        # --- SELECTION LOGIC ---
+        if priority == "bhc":
+            # Priority: BHC -> Still finds the absolute lowest BHC factor
+            best_for_kvp = min(configs_for_kvp, key=lambda x: x["bhcFactor"])
+        else:
+            # Priority: Transmission -> Maximize Throughput (Trans * Flux)
+            # We now use the full list configs_for_kvp to ignore the BHC target gate
+            best_for_kvp = max(configs_for_kvp, key=lambda x: x["transmission"] * x["flux"])
+
+        if best_for_kvp:
+            valid_configurations.append(best_for_kvp)
+
+    return valid_configurations
