@@ -24,6 +24,7 @@ jobs:
         shell: pwsh
         run: |
           pyinstaller --clean --noconsole --onedir --name FilterChoosingTool `
+            --add-data "pyproject.toml;." `
             --collect-submodules apps `
             --collect-all spekpy `
             --collect-all xraydb `

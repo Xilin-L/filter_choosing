@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import os
 import re
+import sys
 
 from core import materialPropertiesData as mpd
 from .engine import (FILTER_OPTIONS, getRuleOfThumbFilterThickness, runAll, optimizeScanParameters)
@@ -26,13 +27,18 @@ def _safeInt(s: str, fieldName: str) -> int:
 
 
 def _get_app_version() -> str:
-    """Reads the version dynamically from pyproject.toml so we don't have to hardcode it."""
+    """Reads the version dynamically from pyproject.toml."""
     try:
-        # __file__ is apps/filter_choosing/gui.py
-        # Go up two directories to reach the project root
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        root_dir = os.path.dirname(os.path.dirname(current_dir))
-        toml_path = os.path.join(root_dir, "pyproject.toml")
+        # Check if the app is frozen/compiled by PyInstaller
+        if getattr(sys, 'frozen', False):
+            # Running as a bundled EXE (pyproject.toml is in the internal _MEIPASS folder)
+            base_dir = sys._MEIPASS
+        else:
+            # Running normally from the Python script (go up two folders to project root)
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            base_dir = os.path.dirname(os.path.dirname(current_dir))
+
+        toml_path = os.path.join(base_dir, "pyproject.toml")
 
         if os.path.exists(toml_path):
             with open(toml_path, "r", encoding="utf-8") as f:
