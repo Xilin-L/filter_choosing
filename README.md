@@ -2,7 +2,7 @@
 
 ## To calculate the rule-of-thumb (ROT) thickness of the scan
 
-Fill in the kvp, filter material, material 1, and sample thickness. If there is a second material, can be contrast agent, toggle the option 'enable material 2' and fill in the volume fraction. Then click the 'calculate ROT thickness' button.
+Fill in the kvp, filter material, material 1, and sample thickness. If there is a second material (i.e. contrast agent, air, other minerals), toggle the option 'enable material 2' and fill in the volume fraction. Then click the 'calculate ROT thickness' button on the top right section.
 
 You can apply this value directly by clicking the 'apply ROT thickness' button, or manually input another value.
 
@@ -12,7 +12,15 @@ Cone angle can affect the result for scattering. The default value is given base
 
 If you are using a sample tube, you can toggle the 'enable tube as extra filtering' option and fill in the info.
 
-After you fill in all the values, you can click the 'calculate all' button. The results will be displayed in the output box. You may have to scroll down a bit to see the full results.
+After you fill in all the values, you can click the 'run full simulation' button. The results will be displayed in the output box. You may have to scroll down a bit to see the full results.
+
+## To sweep though the parameters
+
+The 'optimise sweep' button on the bottom right will sweeping through kvps which differs from input kvp values within 50 percent. 
+
+There are two mode: transmission and BHC, which you can select from. The former maximise the overall transmission for larger counts on detector, the later try to keep BHC factor to be less than 1.1.
+
+Note: the optimise sweep function takes the tube option above into account.
 
 
 # Q&A for the current version
