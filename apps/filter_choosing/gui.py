@@ -150,8 +150,46 @@ def main() -> None:
         mat_var = tk.StringVar(value=default_mat)
         frac_var = tk.StringVar(value=default_frac)
 
-        cb = ttk.Combobox(row_frame, textvariable=mat_var, values=SAMPLE_MATERIALS, state="readonly", width=16)
+        # Allow user to type in the box
+        cb = ttk.Combobox(row_frame, textvariable=mat_var, values=SAMPLE_MATERIALS, width=16)
         cb.pack(side="left", padx=(0, 5))
+
+        def filter_materials(event):
+            # Ignore navigation/special keys so we don't interfere with selection
+            if event.keysym in ('Up', 'Down', 'Left', 'Right', 'Return', 'Tab', 'Escape'):
+                return
+
+            # Save the current cursor position
+            cursor_pos = cb.index(tk.INSERT)
+
+            typed = mat_var.get().lower()
+
+            if typed == "":
+                cb["values"] = SAMPLE_MATERIALS
+            else:
+                # 1. Prioritize materials that START with the typed text
+                starts_with = [m for m in SAMPLE_MATERIALS if m.lower().startswith(typed)]
+
+                # 2. Find materials that CONTAIN the text, but don't start with it
+                # (to avoid showing duplicates)
+                contains = [m for m in SAMPLE_MATERIALS if typed in m.lower() and not m.lower().startswith(typed)]
+
+                # 3. Combine them with the prioritized ones first
+                cb["values"] = starts_with + contains
+
+            # Force the dropdown list to pop open
+            cb.tk.call('ttk::combobox::Post', cb)
+
+            # Create a small helper function to restore focus and cursor
+            def restore_focus():
+                cb.focus_set()
+                cb.icursor(cursor_pos)
+
+            # Wait 10 milliseconds to let the OS draw the menu, THEN grab focus back
+            cb.after(10, restore_focus)
+
+        # Bind the key release event to trigger the filter and open the dropdown
+        cb.bind("<KeyRelease>", filter_materials)
 
         ent = ttk.Entry(row_frame, textvariable=frac_var, width=10)
         ent.pack(side="left", padx=(0, 5))
